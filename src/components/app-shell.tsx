@@ -18,6 +18,7 @@ const NAV: Record<AppRole, Item[]> = {
   student: [
     { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { to: "/student/profile", label: "Profile", icon: User },
+    { to: "/student/progress", label: "My Progress", icon: BarChart3 },
     { to: "/student/saved", label: "Saved Posts", icon: Bookmark },
     { to: "/student/applications", label: "Applications", icon: FileText },
     { to: "/settings", label: "Settings", icon: Settings },
