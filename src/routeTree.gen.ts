@@ -20,6 +20,7 @@ import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated.dashboard'
 import { Route as AuthenticatedStudentsIdRouteImport } from './routes/_authenticated.students.$id'
 import { Route as AuthenticatedStudentSavedRouteImport } from './routes/_authenticated.student.saved'
+import { Route as AuthenticatedStudentProgressRouteImport } from './routes/_authenticated.student.progress'
 import { Route as AuthenticatedStudentProfileRouteImport } from './routes/_authenticated.student.profile'
 import { Route as AuthenticatedStudentApplicationsRouteImport } from './routes/_authenticated.student.applications'
 import { Route as AuthenticatedCompanyProfileRouteImport } from './routes/_authenticated.company.profile'
@@ -88,6 +89,12 @@ const AuthenticatedStudentSavedRoute =
   AuthenticatedStudentSavedRouteImport.update({
     id: '/student/saved',
     path: '/student/saved',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedStudentProgressRoute =
+  AuthenticatedStudentProgressRouteImport.update({
+    id: '/student/progress',
+    path: '/student/progress',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedStudentProfileRoute =
@@ -190,6 +197,7 @@ export interface FileRoutesByFullPath {
   '/company/profile': typeof AuthenticatedCompanyProfileRoute
   '/student/applications': typeof AuthenticatedStudentApplicationsRoute
   '/student/profile': typeof AuthenticatedStudentProfileRoute
+  '/student/progress': typeof AuthenticatedStudentProgressRoute
   '/student/saved': typeof AuthenticatedStudentSavedRoute
   '/students/$id': typeof AuthenticatedStudentsIdRoute
   '/admin/companies/$id': typeof AuthenticatedAdminCompaniesIdRoute
@@ -216,6 +224,7 @@ export interface FileRoutesByTo {
   '/company/profile': typeof AuthenticatedCompanyProfileRoute
   '/student/applications': typeof AuthenticatedStudentApplicationsRoute
   '/student/profile': typeof AuthenticatedStudentProfileRoute
+  '/student/progress': typeof AuthenticatedStudentProgressRoute
   '/student/saved': typeof AuthenticatedStudentSavedRoute
   '/students/$id': typeof AuthenticatedStudentsIdRoute
   '/admin/companies/$id': typeof AuthenticatedAdminCompaniesIdRoute
@@ -244,6 +253,7 @@ export interface FileRoutesById {
   '/_authenticated/company/profile': typeof AuthenticatedCompanyProfileRoute
   '/_authenticated/student/applications': typeof AuthenticatedStudentApplicationsRoute
   '/_authenticated/student/profile': typeof AuthenticatedStudentProfileRoute
+  '/_authenticated/student/progress': typeof AuthenticatedStudentProgressRoute
   '/_authenticated/student/saved': typeof AuthenticatedStudentSavedRoute
   '/_authenticated/students/$id': typeof AuthenticatedStudentsIdRoute
   '/_authenticated/admin/companies/$id': typeof AuthenticatedAdminCompaniesIdRoute
@@ -272,6 +282,7 @@ export interface FileRouteTypes {
     | '/company/profile'
     | '/student/applications'
     | '/student/profile'
+    | '/student/progress'
     | '/student/saved'
     | '/students/$id'
     | '/admin/companies/$id'
@@ -298,6 +309,7 @@ export interface FileRouteTypes {
     | '/company/profile'
     | '/student/applications'
     | '/student/profile'
+    | '/student/progress'
     | '/student/saved'
     | '/students/$id'
     | '/admin/companies/$id'
@@ -325,6 +337,7 @@ export interface FileRouteTypes {
     | '/_authenticated/company/profile'
     | '/_authenticated/student/applications'
     | '/_authenticated/student/profile'
+    | '/_authenticated/student/progress'
     | '/_authenticated/student/saved'
     | '/_authenticated/students/$id'
     | '/_authenticated/admin/companies/$id'
@@ -424,6 +437,13 @@ declare module '@tanstack/react-router' {
       path: '/student/saved'
       fullPath: '/student/saved'
       preLoaderRoute: typeof AuthenticatedStudentSavedRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/student/progress': {
+      id: '/_authenticated/student/progress'
+      path: '/student/progress'
+      fullPath: '/student/progress'
+      preLoaderRoute: typeof AuthenticatedStudentProgressRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/student/profile': {
@@ -536,6 +556,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedCompanyProfileRoute: typeof AuthenticatedCompanyProfileRoute
   AuthenticatedStudentApplicationsRoute: typeof AuthenticatedStudentApplicationsRoute
   AuthenticatedStudentProfileRoute: typeof AuthenticatedStudentProfileRoute
+  AuthenticatedStudentProgressRoute: typeof AuthenticatedStudentProgressRoute
   AuthenticatedStudentSavedRoute: typeof AuthenticatedStudentSavedRoute
   AuthenticatedStudentsIdRoute: typeof AuthenticatedStudentsIdRoute
   AuthenticatedAdminCompaniesIdRoute: typeof AuthenticatedAdminCompaniesIdRoute
@@ -557,6 +578,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedCompanyProfileRoute: AuthenticatedCompanyProfileRoute,
   AuthenticatedStudentApplicationsRoute: AuthenticatedStudentApplicationsRoute,
   AuthenticatedStudentProfileRoute: AuthenticatedStudentProfileRoute,
+  AuthenticatedStudentProgressRoute: AuthenticatedStudentProgressRoute,
   AuthenticatedStudentSavedRoute: AuthenticatedStudentSavedRoute,
   AuthenticatedStudentsIdRoute: AuthenticatedStudentsIdRoute,
   AuthenticatedAdminCompaniesIdRoute: AuthenticatedAdminCompaniesIdRoute,
