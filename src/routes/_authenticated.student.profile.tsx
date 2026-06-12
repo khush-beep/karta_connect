@@ -30,6 +30,7 @@ function StudentProfilePage() {
   const [graduationYear, setGraduationYear] = useState("");
   const [bio, setBio] = useState("");
   const [skills, setSkills] = useState<string[]>([]);
+  const [loadingSkills, setLoadingSkills] = useState(false);
   const [newSkill, setNewSkill] = useState("");
   const [achievements, setAchievements] = useState("");
   const [extracurriculars, setExtracurriculars] = useState("");
@@ -37,40 +38,43 @@ function StudentProfilePage() {
   const [avatarUrl, setAvatarUrl] = useState("");
 
   useEffect(() => {
-    async function loadProfile() {
-      if (!user) return;
-      setLoading(true);
-      try {
-        const { data, error } = await supabase
-          .from("student_profiles")
-          .select("*")
-          .eq("user_id", user.id)
-          .maybeSingle();
+    if (!user) return;
 
-        if (data) {
-          setName(data.name || "");
-          setEmail(data.email || "");
-          setLocation(data.location || "");
-          setUniversity(data.university || "");
-          setCourse(data.course || "");
-          setYearOfStudy(data.year_of_study || "1st Year");
-          setGraduationYear(data.graduation_year || "");
-          setBio(data.bio || "");
-          setSkills(data.skills || []);
-          setAchievements(data.achievements || "");
-          setExtracurriculars(data.extracurriculars || "");
-          setResumeUrl(data.resume_url || "");
-          setAvatarUrl(data.avatar_url || "");
-        }
-      } catch (err) {
-        console.error("Error loading profile:", err);
-      } finally {
-        setLoading(false);
-      }
-    }
     loadProfile();
+    loadSkills();
   }, [user]);
 
+
+  async function loadProfile() {
+    if (!user) return;
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("student_profiles")
+        .select("*")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (data) {
+        setName(data.name || "");
+        setEmail(data.email || "");
+        setLocation(data.location || "");
+        setUniversity(data.university || "");
+        setCourse(data.course || "");
+        setYearOfStudy(data.year_of_study || "1st Year");
+        setGraduationYear(data.graduation_year || "");
+        setBio(data.bio || "");
+        setAchievements(data.achievements || "");
+        setExtracurriculars(data.extracurriculars || "");
+        setResumeUrl(data.resume_url || "");
+        setAvatarUrl(data.avatar_url || "");
+      }
+    } catch (err) {
+      console.error("Error loading profile:", err);
+    } finally {
+      setLoading(false);
+    }
+  }
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     if (!user) return;
@@ -92,7 +96,6 @@ function StudentProfilePage() {
           year_of_study: yearOfStudy,
           graduation_year: graduationYear,
           bio,
-          skills,
           achievements,
           extracurriculars,
           resume_url: resumeUrl,
@@ -175,16 +178,76 @@ function StudentProfilePage() {
     }
   }
 
-  function addSkill() {
-    const trimmed = newSkill.trim().toLowerCase();
-    if (trimmed && !skills.includes(trimmed)) {
-      setSkills([...skills, trimmed]);
-      setNewSkill("");
+  async function loadSkills() {
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from("skill_history")
+      .select("skill_name")
+      .eq("user_id", user.id)
+      .order("added_at", { ascending: true });
+
+    if (error) {
+      console.error(error);
+      return;
     }
+
+    setSkills(data?.map(s => s.skill_name) || []);
   }
 
-  function removeSkill(skill: string) {
-    setSkills(skills.filter((s) => s !== skill));
+  async function addSkill() {
+    const trimmed = newSkill.trim().toLowerCase();
+
+    if (!user) return;
+
+    if (!trimmed) return;
+
+    if (skills.includes(trimmed)) {
+      toast.error("Skill already exists");
+      return;
+    }
+    setLoadingSkills(true);
+
+    const { error } = await supabase
+      .from("skill_history")
+      .insert({
+        user_id: user.id,
+        skill_name: trimmed
+      });
+
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    setSkills(prev => [...prev, trimmed]);
+
+    setNewSkill("");
+    setLoadingSkills(false);
+
+    toast.success("Skill added successfully");
+  }
+
+  async function removeSkill(skill: string) {
+    if (!user) return;
+    setLoadingSkills(true);
+
+    const { error } = await supabase
+      .from("skill_history")
+      .delete()
+      .eq("user_id", user.id)
+      .eq("skill_name", skill);
+
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    setSkills(prev =>
+      prev.filter(s => s !== skill)
+    );
+    setLoadingSkills(false);
+    toast.success("Skill removed");
   }
 
   if (loading) {
@@ -315,7 +378,13 @@ function StudentProfilePage() {
                   onChange={(e) => setNewSkill(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSkill(); } }}
                 />
-                <Button type="button" onClick={addSkill}>Add</Button>
+                <Button
+                  type="button"
+                  onClick={addSkill}
+                  disabled={loadingSkills}
+                >
+                  {loadingSkills ? "Adding..." : "Add"}
+                </Button>
               </div>
               <div className="flex flex-wrap gap-1.5 mt-2">
                 {skills.length === 0 ? (
