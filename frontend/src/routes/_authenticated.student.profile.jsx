@@ -32,6 +32,7 @@ function StudentProfilePage() {
     const [extracurriculars, setExtracurriculars] = useState("");
     const [resumeUrl, setResumeUrl] = useState("");
     const [avatarUrl, setAvatarUrl] = useState("");
+    const [isEditing, setIsEditing] = useState(false);
     useEffect(() => {
         async function loadProfile() {
             if (!user)
@@ -99,6 +100,7 @@ function StudentProfilePage() {
             if (error)
                 throw error;
             toast.success("Profile saved successfully!");
+            setIsEditing(false);
         }
         catch (err) {
             toast.error(err.message || "Failed to save profile.");
@@ -141,9 +143,19 @@ function StudentProfilePage() {
         }
     }
     async function handleResumeUpload(e) {
-        const file = e.target.files?.[0];
-        if (!file || !user)
-            return;
+      const file = e.target.files?.[0];
+
+      if (!file || !user) return;
+
+// PDF validation
+      if (file.type !== "application/pdf") {
+           toast.error("Only PDF files are allowed.");
+           return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+          toast.error("Resume size must not exceed 5 MB.");
+          return;
+      }  
         setUploadingResume(true);
         try {
             const filePath = `${user.id}/${Date.now()}_${file.name}`;
@@ -159,9 +171,10 @@ function StudentProfilePage() {
             }
             else {
                 const { data: publicUrlData } = supabase.storage
-                    .from("resumes")
-                    .getPublicUrl(filePath);
-                setResumeUrl(filePath);
+                     .from("resumes")
+                     .getPublicUrl(filePath);
+
+                setResumeUrl(publicUrlData.publicUrl);
                 toast.success("Resume document uploaded!");
             }
         }
@@ -194,6 +207,25 @@ function StudentProfilePage() {
       </div>
 
       <form onSubmit={handleSave} className="space-y-6">
+
+  <div className="flex justify-end mb-4">
+    {!isEditing ? (
+      <Button
+        type="button"
+        onClick={() => setIsEditing(true)}
+      >
+        Update Profile
+      </Button>
+    ) : (
+      <Button
+        type="button"
+        variant="outline"
+        onClick={() => setIsEditing(false)}
+      >
+        Cancel
+      </Button>
+    )}
+  </div>
         {/* Core Profile */}
         <Card>
           <CardHeader>
@@ -210,19 +242,36 @@ function StudentProfilePage() {
                     <Loader2 className="h-5 w-5 animate-spin"/>
                   </div>)}
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="avatar-file" className="cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md text-sm font-medium inline-block">
-                  Change Photo
-                </Label>
-                <input id="avatar-file" type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden"/>
-                <p className="text-xs text-muted-foreground">Allowed formats: PNG, JPG, JPEG. Max size 2MB.</p>
-              </div>
+              {isEditing && (
+  <div className="space-y-2">
+    <Label
+      htmlFor="avatar-file"
+      className="cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md text-sm font-medium inline-block"
+    >
+      Change Photo
+    </Label>
+
+    <input
+      id="avatar-file"
+      type="file"
+      accept="image/*"
+      onChange={handleAvatarUpload}
+      className="hidden"
+    />
+  </div>
+)}
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
                 <Label htmlFor="stud-name">Full Name <span className="text-destructive">*</span></Label>
-                <Input id="stud-name" value={name} onChange={(e) => setName(e.target.value)} required/>
+                <Input
+                  id="stud-name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  disabled={!isEditing}
+                  required
+                />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="stud-email">Contact Email</Label>
@@ -230,11 +279,22 @@ function StudentProfilePage() {
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="stud-loc">Location</Label>
-                <Input id="stud-loc" placeholder="e.g. Bangalore" value={location} onChange={(e) => setLocation(e.target.value)}/>
+                <Input
+                  id="stud-loc"
+                  placeholder="e.g. Bangalore"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  disabled={!isEditing}
+                />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="stud-bio">Bio</Label>
-                <Input id="stud-bio" placeholder="Write a short summary about yourself" value={bio} onChange={(e) => setBio(e.target.value)}/>
+                <Input
+                  id="stud-bio"
+                  value={bio}
+                  onChange={(e) => setBio(e.target.value)}
+                  disabled={!isEditing}
+                />
               </div>
             </div>
           </CardContent>
@@ -251,15 +311,29 @@ function StudentProfilePage() {
           <CardContent className="grid gap-4 sm:grid-cols-2">
             <div className="grid gap-2">
               <Label htmlFor="stud-uni">University <span className="text-destructive">*</span></Label>
-              <Input id="stud-uni" value={university} onChange={(e) => setUniversity(e.target.value)} required/>
+              <Input
+                id="stud-uni"
+                value={university}
+                onChange={(e) => setUniversity(e.target.value)}
+                disabled={!isEditing}
+              />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="stud-course">Course of Study <span className="text-destructive">*</span></Label>
-              <Input id="stud-course" placeholder="e.g. B-Tech Computer Science" value={course} onChange={(e) => setCourse(e.target.value)} required/>
-            </div>
+              <Input
+                id="stud-course"
+                value={course}
+                onChange={(e) => setCourse(e.target.value)}
+                disabled={!isEditing}
+              />            </div>
             <div className="grid gap-2">
               <Label htmlFor="stud-year">Year of Study <span className="text-destructive">*</span></Label>
-              <select id="stud-year" value={yearOfStudy} onChange={(e) => setYearOfStudy(e.target.value)} className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" required>
+              <select
+                id="stud-year"
+                value={yearOfStudy}
+                onChange={(e) => setYearOfStudy(e.target.value)}
+                disabled={!isEditing}
+              >
                 <option value="1st Year">1st Year</option>
                 <option value="2nd Year">2nd Year</option>
                 <option value="3rd Year">3rd Year</option>
@@ -269,7 +343,12 @@ function StudentProfilePage() {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="stud-grad">Graduation Year <span className="text-destructive">*</span></Label>
-              <Input id="stud-grad" type="number" placeholder="e.g. 2028" value={graduationYear} onChange={(e) => setGraduationYear(e.target.value)} required/>
+              <Input
+                id="stud-grad"
+                value={graduationYear}
+                onChange={(e) => setGraduationYear(e.target.value)}
+                disabled={!isEditing}
+              />
             </div>
           </CardContent>
         </Card>
@@ -287,33 +366,70 @@ function StudentProfilePage() {
             <div className="space-y-2">
               <Label htmlFor="stud-skills">Add Skills</Label>
               <div className="flex gap-2">
-                <Input id="stud-skills" placeholder="e.g. Python, SQL, React" value={newSkill} onChange={(e) => setNewSkill(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") {
-        e.preventDefault();
-        addSkill();
-    } }}/>
-                <Button type="button" onClick={addSkill}>Add</Button>
+                <Input
+                  id="stud-skills"
+                  placeholder="e.g. Python, SQL, React"
+                  value={newSkill}
+                  onChange={(e) => setNewSkill(e.target.value)}
+                  disabled={!isEditing}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && isEditing) {
+                       e.preventDefault();
+                       addSkill();
+                    }
+                  }}
+                />
+                {isEditing && (
+                  <Button type="button" onClick={addSkill}>
+                    Add
+                  </Button>
+                )}
               </div>
               <div className="flex flex-wrap gap-1.5 mt-2">
                 {skills.length === 0 ? (<span className="text-xs text-muted-foreground">No skills added yet.</span>) : (skills.map((skill) => (<span key={skill} className="inline-flex items-center gap-1 bg-muted px-2.5 py-1 rounded-full text-xs font-medium capitalize">
                       {skill}
-                      <button type="button" onClick={() => removeSkill(skill)} className="text-muted-foreground hover:text-foreground">
-                        <X className="h-3 w-3"/>
-                      </button>
+                      {isEditing && (
+                        <button
+                          type="button"
+                          onClick={() => removeSkill(skill)}
+                        >
+                          <X className="h-3 w-3"/>
+                        </button>
+                      )}
                     </span>)))}
               </div>
             </div>
 
             {/* Resume Upload */}
             <div className="space-y-2 border-t pt-4">
-              <Label>Resume Document</Label>
+              <div>
+                <Label>Resume Document</Label>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Accepted format: PDF only • Maximum file size: 5 MB
+                </p>
+              </div>
               <div className="flex items-center gap-4">
                 <Label htmlFor="resume-file" className="cursor-pointer border border-input hover:bg-muted px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2">
-                  <Upload className="h-4 w-4"/> {uploadingResume ? "Uploading..." : "Upload Resume (PDF)"}
+                  <Upload className="h-4 w-4"/> {uploadingResume ? "Uploading..." : "Upload Resume (PDF, Max 5MB)"}
                 </Label>
                 <input id="resume-file" type="file" accept=".pdf" onChange={handleResumeUpload} className="hidden"/>
-                {resumeUrl && (<span className="text-xs text-muted-foreground flex items-center gap-1.5">
-                    <FileText className="h-4 w-4 text-primary"/> Resume uploaded
-                  </span>)}
+               {resumeUrl && (
+  <div className="flex items-center gap-3">
+    <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+      <FileText className="h-4 w-4 text-primary" />
+      Resume uploaded
+    </span>
+
+    <a
+      href={resumeUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-sm text-blue-600 underline"
+    >
+      View Resume
+    </a>
+  </div>
+)}
               </div>
             </div>
           </CardContent>
@@ -330,18 +446,34 @@ function StudentProfilePage() {
           <CardContent className="space-y-4">
             <div className="grid gap-2">
               <Label htmlFor="stud-ach">Achievements & Certificates</Label>
-              <textarea id="stud-ach" placeholder="List major contest placements, certified credentials..." value={achievements} onChange={(e) => setAchievements(e.target.value)} className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"/>
+              <textarea
+                id="stud-ach"
+                placeholder="List major contest placements, certified credentials..."
+                value={achievements}
+                onChange={(e) => setAchievements(e.target.value)}
+                disabled={!isEditing}
+                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="stud-extra">Extracurricular Activities</Label>
-              <textarea id="stud-extra" placeholder="Clubs, associations, sports, volunteering..." value={extracurriculars} onChange={(e) => setExtracurriculars(e.target.value)} className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"/>
+              <textarea
+                id="stud-extra"
+                placeholder="Clubs, associations, sports, volunteering..."
+                value={extracurriculars}
+                onChange={(e) => setExtracurriculars(e.target.value)}
+                disabled={!isEditing}
+                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              />
             </div>
           </CardContent>
         </Card>
 
-        <Button type="submit" className="w-full" disabled={saving}>
-          {saving ? "Saving Profile..." : "Save Profile Details"}
-        </Button>
+        {isEditing && (
+          <Button type="submit" className="w-full" disabled={saving}>
+            {saving ? "Saving Profile..." : "Save Changes"}
+          </Button>
+        )}
       </form>
     </div>);
 }
