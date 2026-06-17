@@ -173,6 +173,15 @@ app.post("/api/auth/signup", async (req, res) => {
 
     console.log("AUTH DATA:", authData);
     console.log("SIGNUP ERROR:", signUpError);
+    // Auth signUp using a dedicated client for the new user so they can insert their own roles/profile
+    const newUserClient = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: { persistSession: false }
+    });
+
+    const { data: authData, error: signUpError } = await newUserClient.auth.signUp({
+      email: cleanEmail,
+      password: password
+    });
 
     if (signUpError || !authData.user) {
       throw new Error(
@@ -190,8 +199,19 @@ app.post("/api/auth/signup", async (req, res) => {
 
     console.log("NEW USER ID:", newUserId);
 
-    // Assign role
-    const { error: roleError } = await adminClient.from("user_roles").insert({
+    // Explicitly sign in as the new user to ensure the session is active for RLS
+    if (!authData.session) {
+      const { error: signInErr } = await newUserClient.auth.signInWithPassword({
+        email: cleanEmail,
+        password: password
+      });
+      if (signInErr) {
+        throw new Error(`Failed to sign in new user for RLS: ${signInErr.message}`);
+      }
+    }
+
+    // Assign role using the newUserClient because RLS policy says auth.uid() = user_id
+    const { error: roleError } = await newUserClient.from('user_roles').insert({
       user_id: newUserId,
       role: role,
     });
@@ -201,21 +221,19 @@ app.post("/api/auth/signup", async (req, res) => {
     }
 
     // Save profile details
-    if (role === "student" && whitelistRow) {
-      const { error: profileError } = await adminClient
-        .from("student_profiles")
-        .insert({
-          user_id: newUserId,
-          name: whitelistRow.name || "",
-          email: cleanEmail,
-          location: whitelistRow.place || "",
-          university: whitelistRow.university || "",
-          course: whitelistRow.course || "",
-          year_of_study: whitelistRow.year_of_study || "1st Year",
-          graduation_year: whitelistRow.graduation_year || "",
-          skills: [],
-          blocked: false,
-        });
+    if (role === 'student' && whitelistRow) {
+      const { error: profileError } = await newUserClient.from('student_profiles').insert({
+        user_id: newUserId,
+        name: whitelistRow.name || '',
+        email: cleanEmail,
+        location: whitelistRow.place || '',
+        university: whitelistRow.university || '',
+        course: whitelistRow.course || '',
+        year_of_study: whitelistRow.year_of_study || '1st Year',
+        graduation_year: whitelistRow.graduation_year || '',
+        skills: [],
+        blocked: false
+      });
 
       if (profileError) {
         throw new Error(
@@ -223,11 +241,13 @@ app.post("/api/auth/signup", async (req, res) => {
         );
       }
 
+      // Update whitelist using adminClient because new user does not have permission
       await adminClient
         .from("student_whitelist")
         .update({ used: true })
-        .eq("id", whitelistRow.id);
-    } else if (role === "company" && companyRow) {
+        .eq('id', whitelistRow.id);
+    } else if (role === 'company' && companyRow) {
+      // Update company link using adminClient because new user does not own the company yet
       const { error: companyLinkError } = await adminClient
         .from("companies")
         .update({ owner_user_id: newUserId })
@@ -313,6 +333,67 @@ app.post("/api/admin/delete-student", async (req, res) => {
     return res
       .status(500)
       .json({ error: err.message || "Failed to delete student." });
+  }
+});
+
+// 5. Admin Bulk Upload Route
+app.post('/api/admin/bulk-upload-whitelist', async (req, res) => {
+  const { records } = req.body;
+  if (!records || !Array.isArray(records)) {
+    return res.status(400).json({ error: 'Records array is required.' });
+  }
+
+  try {
+    const adminClient = await getAdminClient();
+    
+    // Check existing emails
+    const [profilesRes, whitelistRes] = await Promise.all([
+      adminClient.from('student_profiles').select('email'),
+      adminClient.from('student_whitelist').select('email')
+    ]);
+
+    const existingEmails = new Set([
+      ...(profilesRes.data || []).map(p => p.email.toLowerCase()),
+      ...(whitelistRes.data || []).map(w => w.email.toLowerCase())
+    ]);
+
+    const recordsToInsert = [];
+    let skipped = 0;
+
+    for (const row of records) {
+      const email = row.email?.toString().trim().toLowerCase();
+      if (!email) continue;
+      
+      if (existingEmails.has(email)) {
+        skipped++;
+        continue;
+      }
+      
+      recordsToInsert.push(row);
+      existingEmails.add(email);
+    }
+
+    if (recordsToInsert.length === 0) {
+      return res.json({ success: true, inserted: 0, skipped });
+    }
+
+    // Insert individually to avoid any RLS caching issues
+    let inserted = 0;
+    let failed = 0;
+    for (const record of recordsToInsert) {
+      const { error } = await adminClient.from('student_whitelist').insert(record);
+      if (error) {
+        console.error('Failed to insert record:', record.email, error);
+        failed++;
+      } else {
+        inserted++;
+      }
+    }
+
+    return res.json({ success: true, inserted, skipped, failed });
+  } catch (err) {
+    console.error('Bulk upload error:', err);
+    return res.status(500).json({ error: err.message || 'Failed to bulk upload.' });
   }
 });
 
