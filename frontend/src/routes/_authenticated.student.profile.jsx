@@ -2,12 +2,13 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
+import { getSignedResumeUrl } from "@/lib/storage-paths";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Loader2, User, BookOpen, Award, FileText, Upload, X } from "lucide-react";
+import { Loader2, User, BookOpen, Award, FileText, Upload, X, ExternalLink } from "lucide-react";
 export const Route = createFileRoute("/_authenticated/student/profile")({
     component: StudentProfilePage,
 });
@@ -26,11 +27,15 @@ function StudentProfilePage() {
     const [yearOfStudy, setYearOfStudy] = useState("1st Year");
     const [graduationYear, setGraduationYear] = useState("");
     const [bio, setBio] = useState("");
+    const [githubUrl, setGithubUrl] = useState("");
+    const [portfolioUrl, setPortfolioUrl] = useState("");
+    const [projectUrl, setProjectUrl] = useState("");
     const [skills, setSkills] = useState([]);
     const [newSkill, setNewSkill] = useState("");
     const [achievements, setAchievements] = useState("");
     const [extracurriculars, setExtracurriculars] = useState("");
     const [resumeUrl, setResumeUrl] = useState("");
+    const [resumeDownloadUrl, setResumeDownloadUrl] = useState(null);
     const [avatarUrl, setAvatarUrl] = useState("");
     const [isEditing, setIsEditing] = useState(false);
     useEffect(() => {
@@ -53,6 +58,9 @@ function StudentProfilePage() {
                     setYearOfStudy(data.year_of_study || "1st Year");
                     setGraduationYear(data.graduation_year || "");
                     setBio(data.bio || "");
+                    setGithubUrl(data.github_url || "");
+                    setPortfolioUrl(data.portfolio_url || "");
+                    setProjectUrl(data.project_url || "");
                     setSkills(data.skills || []);
                     setAchievements(data.achievements || "");
                     setExtracurriculars(data.extracurriculars || "");
@@ -69,6 +77,25 @@ function StudentProfilePage() {
         }
         loadProfile();
     }, [user]);
+
+    useEffect(() => {
+        let canceled = false;
+        async function loadResumeLink() {
+            if (!resumeUrl) {
+                setResumeDownloadUrl(null);
+                return;
+            }
+            const url = await getSignedResumeUrl(resumeUrl, supabase);
+            if (!canceled) {
+                setResumeDownloadUrl(url);
+            }
+        }
+        loadResumeLink();
+        return () => {
+            canceled = true;
+        };
+    }, [resumeUrl]);
+
     async function handleSave(e) {
         e.preventDefault();
         if (!user)
@@ -92,6 +119,9 @@ function StudentProfilePage() {
                 skills,
                 achievements,
                 extracurriculars,
+                github_url: githubUrl,
+                portfolio_url: portfolioUrl,
+                project_url: projectUrl,
                 resume_url: resumeUrl,
                 avatar_url: avatarUrl,
                 updated_at: new Date().toISOString()
@@ -170,11 +200,11 @@ function StudentProfilePage() {
                 toast.info("Simulated resume upload completed.");
             }
             else {
-                const { data: publicUrlData } = supabase.storage
-                     .from("resumes")
-                     .getPublicUrl(filePath);
-
-                setResumeUrl(publicUrlData.publicUrl);
+                setResumeUrl(filePath);
+                const signedUrl = await getSignedResumeUrl(filePath, supabase);
+                if (signedUrl) {
+                    setResumeDownloadUrl(signedUrl);
+                }
                 toast.success("Resume document uploaded!");
             }
         }
@@ -205,7 +235,6 @@ function StudentProfilePage() {
         <h1 className="text-3xl font-extrabold tracking-tight">Edit Student Profile</h1>
         <p className="text-muted-foreground">Keep your academic and professional details updated for companies.</p>
       </div>
-
       <form onSubmit={handleSave} className="space-y-6">
 
   <div className="flex justify-end mb-4">
@@ -353,6 +382,50 @@ function StudentProfilePage() {
           </CardContent>
         </Card>
 
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ExternalLink className="h-5 w-5 text-primary"/> External Links
+            </CardTitle>
+            <CardDescription>Optional GitHub, portfolio, and project URLs.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-2">
+              <Label htmlFor="stud-github">GitHub URL</Label>
+              <Input
+                id="stud-github"
+                type="url"
+                placeholder="https://github.com/username"
+                value={githubUrl}
+                onChange={(e) => setGithubUrl(e.target.value)}
+                disabled={!isEditing}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="stud-portfolio">Portfolio URL</Label>
+              <Input
+                id="stud-portfolio"
+                type="url"
+                placeholder="https://portfolio.example.com"
+                value={portfolioUrl}
+                onChange={(e) => setPortfolioUrl(e.target.value)}
+                disabled={!isEditing}
+              />
+            </div>
+            <div className="grid gap-2 sm:col-span-2">
+              <Label htmlFor="stud-project">Project URL</Label>
+              <Input
+                id="stud-project"
+                type="url"
+                placeholder="https://project.example.com"
+                value={projectUrl}
+                onChange={(e) => setProjectUrl(e.target.value)}
+                disabled={!isEditing}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Skills & Resume */}
         <Card>
           <CardHeader>
@@ -420,14 +493,18 @@ function StudentProfilePage() {
       Resume uploaded
     </span>
 
-    <a
-      href={resumeUrl}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="text-sm text-blue-600 underline"
-    >
-      View Resume
-    </a>
+    {resumeDownloadUrl ? (
+      <a
+        href={resumeDownloadUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-sm text-blue-600 underline"
+      >
+        View Resume
+      </a>
+    ) : (
+      <span className="text-sm text-muted-foreground">Preparing link...</span>
+    )}
   </div>
 )}
               </div>
