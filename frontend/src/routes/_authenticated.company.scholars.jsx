@@ -68,16 +68,20 @@ function CompanyScholarsPage() {
   const universities = [...new Set(students.map((s) => s.university).filter(Boolean))];
 
   const courses = [...new Set(students.map((s) => s.course).filter(Boolean))];
-
   const filtered = students.filter((student) => {
     const value = search.toLowerCase();
 
-    return (
+    const matchesSearch =
       student.name?.toLowerCase().includes(value) ||
       student.university?.toLowerCase().includes(value) ||
       student.course?.toLowerCase().includes(value) ||
-      student.skills?.join(" ").toLowerCase().includes(value)
-    );
+      student.skills?.join(" ").toLowerCase().includes(value);
+
+    const matchesUniversity = !selectedUniversity || student.university === selectedUniversity;
+
+    const matchesCourse = !selectedCourse || student.course === selectedCourse;
+
+    return matchesSearch && matchesUniversity && matchesCourse;
   });
 
   return (
@@ -133,6 +137,13 @@ function CompanyScholarsPage() {
 
             <p>{student.year_of_study}</p>
 
+            <p className="text-muted-foreground">📍 {student.location || "Not specified"}</p>
+
+            <p className="text-muted-foreground">
+              🎓 Graduation:
+              {student.graduation_year || "N/A"}
+            </p>
+
             <div className="flex gap-2 mt-2 flex-wrap">
               {student.skills?.map((skill) => (
                 <span
@@ -150,8 +161,25 @@ function CompanyScholarsPage() {
               </p>
             </div>
 
-            <div className="mt-4 flex gap-3">
+            <div className="mt-4 flex gap-3 flex-wrap">
               <button className="bg-blue-600 text-white px-4 py-2 rounded-md">View Profile</button>
+
+              {student.resume_url && (
+                <a
+                  href={student.resume_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="
+ bg-purple-600
+ text-white
+ px-4
+ py-2
+ rounded-md
+ "
+                >
+                  View Resume
+                </a>
+              )}
 
               <button className="bg-green-600 text-white px-4 py-2 rounded-md">Message</button>
             </div>

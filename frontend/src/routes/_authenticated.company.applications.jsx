@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Loader2, User, FileText, Info, ExternalLink } from "lucide-react";
+
 export const Route = createFileRoute("/_authenticated/company/applications")({
   component: CompanyApplicationsPage,
 });
@@ -15,6 +16,7 @@ function CompanyApplicationsPage() {
   const [company, setCompany] = useState(null);
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState("all");
   async function loadData() {
     if (!user) return;
     setLoading(true);
@@ -90,19 +92,81 @@ function CompanyApplicationsPage() {
   useEffect(() => {
     loadData();
   }, [user]);
+
   async function handleStatusChange(appId, newStatus) {
     try {
+      // Update application status
+
       const { error } = await supabase
+
         .from("applications")
+
         .update({ status: newStatus })
+
         .eq("id", appId);
+
       if (error) throw error;
+
+      // Find current application
+
+      const currentApp = applications.find((a) => a.id === appId);
+
+      if (!currentApp) {
+        loadData();
+
+        return;
+      }
+
+      const postId = currentApp.post_id;
+
+      // Count selected candidates
+
+      const { data: selectedApps } = await supabase
+
+        .from("applications")
+
+        .select("*")
+
+        .eq("post_id", postId)
+
+        .eq("status", "selected");
+
+      // Get max positions
+
+      const { data: job } = await supabase
+
+        .from("job_posts")
+
+        .select("max_positions")
+
+        .eq("id", postId)
+
+        .single();
+
+      // Auto close
+
+      if (selectedApps && job && selectedApps.length >= job.max_positions) {
+        await supabase
+
+          .from("job_posts")
+
+          .update({
+            active: false,
+
+            status: "closed",
+          })
+
+          .eq("id", postId);
+      }
+
       toast.success(`Applicant status updated to ${newStatus}!`);
+
       loadData();
     } catch (err) {
       toast.error(err.message || "Failed to update status.");
     }
   }
+
   function getResumeDownloadUrl(filePath) {
     // If the path contains the full URL already, return it directly
     if (filePath.startsWith("http://") || filePath.startsWith("https://")) {
@@ -138,8 +202,27 @@ function CompanyApplicationsPage() {
   const statusStyles = {
     applied: "bg-blue-500/10 text-blue-500 border-blue-500/20",
     review: "bg-amber-500/10 text-amber-500 border-amber-500/20",
+    shortlisted: "bg-purple-500/10 text-purple-500 border-purple-500/20",
     selected: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
     rejected: "bg-destructive/10 text-destructive border-destructive/20",
+  };
+  const filteredApplications =
+    statusFilter === "all"
+      ? applications
+      : applications.filter((app) => app.status === statusFilter);
+
+  const counts = {
+    all: applications.length,
+
+    applied: applications.filter((a) => a.status === "applied").length,
+
+    review: applications.filter((a) => a.status === "review").length,
+
+    shortlisted: applications.filter((a) => a.status === "shortlisted").length,
+
+    selected: applications.filter((a) => a.status === "selected").length,
+
+    rejected: applications.filter((a) => a.status === "rejected").length,
   };
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -150,19 +233,38 @@ function CompanyApplicationsPage() {
         </p>
       </div>
 
-      {applications.length === 0 ? (
+      <div className="flex gap-4">
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="border rounded-md p-2 bg-background"
+        >
+          <option value="all">All ({counts.all})</option>
+
+          <option value="applied">Applied ({counts.applied})</option>
+
+          <option value="review">Under Review ({counts.review})</option>
+
+          <option value="shortlisted">Shortlisted ({counts.shortlisted})</option>
+
+          <option value="selected">Selected ({counts.selected})</option>
+
+          <option value="rejected">Rejected ({counts.rejected})</option>
+        </select>
+      </div>
+
+      {filteredApplications.length === 0 ? (
         <Card className="border-dashed py-12 text-center max-w-xl mx-auto">
           <CardHeader>
             <User className="h-10 w-10 mx-auto text-muted-foreground mb-2" />
-            <CardTitle>No applications received</CardTitle>
-            <CardDescription>
-              You haven't received any candidate applications for your postings yet.
-            </CardDescription>
+            <CardTitle>No candidates found</CardTitle>
+
+            <CardDescription>No candidates found for this status.</CardDescription>
           </CardHeader>
         </Card>
       ) : (
         <div className="space-y-4 max-w-4xl">
-          {applications.map((app) => (
+          {filteredApplications.map((app) => (
             <Card key={app.id}>
               <CardContent className="p-6 space-y-4">
                 <div className="flex flex-col md:flex-row justify-between items-start gap-4 pb-4 border-b">
@@ -212,8 +314,13 @@ function CompanyApplicationsPage() {
                         className="flex h-8 rounded-md border border-input bg-background px-2.5 py-0.5 text-xs shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring font-medium"
                       >
                         <option value="applied">Applied</option>
+
                         <option value="review">Under Review</option>
+
+                        <option value="shortlisted">Shortlisted</option>
+
                         <option value="selected">Selected</option>
+
                         <option value="rejected">Rejected</option>
                       </select>
                     </div>
