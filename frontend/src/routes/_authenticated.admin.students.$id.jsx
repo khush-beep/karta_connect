@@ -8,6 +8,19 @@ import { Loader2, ArrowLeft, User, BookOpen, Award, FileText, ExternalLink, Shie
 export const Route = createFileRoute("/_authenticated/admin/students/$id")({
     component: AdminStudentProfileDetailsPage,
 });
+ async function getResumeUrl(filePath) {
+        if (!filePath) return "";
+        if (filePath.startsWith("http://") || filePath.startsWith("https://")) {
+            return filePath;
+        }
+        try {
+            const url = await getResumeDownloadUrl(filePath, supabase);
+            return url || "";
+        } catch (err) {
+            console.error("Error generating resume URL:", err);
+            return "";
+        }
+  }
 function AdminStudentProfileDetailsPage() {
     const { id: profileId } = Route.useParams();
     const [profile, setProfile] = useState(null);
@@ -73,7 +86,7 @@ function AdminStudentProfileDetailsPage() {
         }
         const { data } = supabase.storage.from("resumes").getPublicUrl(filePath);
         return data.publicUrl;
-    }
+
     if (loading) {
         return (<div className="flex h-[50vh] items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary"/>

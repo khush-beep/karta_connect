@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,11 +18,13 @@ export const Route = createFileRoute("/_authenticated/student/jobs/")({
 });
 function StudentJobsPage() {
     const searchParams = Route.useSearch();
+    const { user } = useAuth();
     const [jobs, setJobs] = useState([]);
+    const [applications, setApplications] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedJob, setSelectedJob] = useState(null);
-    // Load jobs matching the search filters
+    // Load jobs matching the search filters and the current student's applications
     async function loadJobs() {
         setLoading(true);
         try {
@@ -32,10 +35,31 @@ function StudentJobsPage() {
             if (searchParams.type) {
                 query = query.eq("type", searchParams.type);
             }
-            const { data, error } = await query.order("created_at", { ascending: false });
-            if (error)
-                throw error;
-            setJobs(data || []);
+            const [jobResult, applicationResult] = await Promise.all([
+                query.order("created_at", { ascending: false }),
+                user
+                    ? supabase
+                        .from("applications")
+                        .select("post_id, status")
+                        .eq("student_id", user.id)
+                    : Promise.resolve({ data: [], error: null }),
+            ]);
+            if (jobResult.error)
+                throw jobResult.error;
+            if (applicationResult.error)
+                throw applicationResult.error;
+            const studentApplications = applicationResult.data || [];
+            const sortedJobs = (jobResult.data || []).slice().sort((a, b) => {
+                const aApplied = studentApplications.some((app) => app.post_id === a.id);
+                const bApplied = studentApplications.some((app) => app.post_id === b.id);
+                if (aApplied && !bApplied)
+                    return 1;
+                if (!aApplied && bApplied)
+                    return -1;
+                return new Date(b.created_at) - new Date(a.created_at);
+            });
+            setJobs(sortedJobs);
+            setApplications(studentApplications);
         }
         catch (err) {
             console.error("Error loading job posts:", err);
@@ -47,7 +71,7 @@ function StudentJobsPage() {
     }
     useEffect(() => {
         loadJobs();
-    }, [searchParams.type]);
+    }, [searchParams.type, user]);
     const filteredJobs = jobs.filter((job) => {
         const query = searchQuery.toLowerCase().trim();
         if (!query)
@@ -57,6 +81,7 @@ function StudentJobsPage() {
             job.company?.name.toLowerCase().includes(query) ||
             job.required_skills?.some((s) => s.toLowerCase().includes(query)));
     });
+    const appliedStatusMap = new Map(applications.map((app) => [app.post_id, app.status]));
     return (<div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div>
@@ -92,9 +117,14 @@ function StudentJobsPage() {
                   <div className="h-10 w-10 border rounded bg-muted flex items-center justify-center overflow-hidden shrink-0">
                     {job.company?.logo_url ? (<img src={job.company.logo_url} alt={job.company.name} className="h-full w-full object-cover"/>) : (<Briefcase className="h-5 w-5 text-muted-foreground"/>)}
                   </div>
-                  <span className={`text-[10px] border px-2 py-0.5 rounded-full uppercase font-bold tracking-wider ${job.type === "job" ? "bg-blue-500/10 text-blue-500 border-blue-500/20" : "bg-purple-500/10 text-purple-500 border-purple-500/20"}`}>
-                    {job.type}
-                  </span>
+                  <div className="space-y-1 text-right">
+                    <span className={`text-[10px] border px-2 py-0.5 rounded-full uppercase font-bold tracking-wider ${job.type === "job" ? "bg-blue-500/10 text-blue-500 border-blue-500/20" : "bg-purple-500/10 text-purple-500 border-purple-500/20"}`}>
+                      {job.type}
+                    </span>
+                    {appliedStatusMap.get(job.id) && (<span className="text-[10px] border border-emerald-500/20 bg-emerald-500/10 text-emerald-700 px-2 py-0.5 rounded-full uppercase font-bold tracking-wider">
+                        Applied
+                      </span>)}
+                  </div>
                 </div>
                 <CardTitle className="text-lg font-bold mt-3 line-clamp-1">{job.title}</CardTitle>
                 <CardDescription className="text-xs line-clamp-1">{job.company?.name || "Company partner"}</CardDescription>
@@ -184,11 +214,13 @@ function StudentJobsPage() {
             </div>
 
             <div className="border-t pt-4 mt-auto">
-              <Link to="/student/jobs/$id/apply" params={{ id: selectedJob.id }}>
-                <Button className="w-full flex items-center justify-center gap-2" size="lg">
-                  Apply Now <ChevronRight className="h-4 w-4"/>
-                </Button>
-              </Link>
+              {appliedStatusMap.has(selectedJob.id) ? (<Button className="w-full flex items-center justify-center gap-2 bg-emerald-500/10 text-emerald-700 border border-emerald-500/20" size="lg" disabled>
+                  Already Applied
+                </Button>) : (<Link to="/student/jobs/$id/apply" params={{ id: selectedJob.id }}>
+                  <Button className="w-full flex items-center justify-center gap-2" size="lg">
+                    Apply Now <ChevronRight className="h-4 w-4"/>
+                  </Button>
+                </Link>)}
             </div>
           </SheetContent>)}
       </Sheet>

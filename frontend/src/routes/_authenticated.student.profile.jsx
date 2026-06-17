@@ -38,6 +38,7 @@ function StudentProfilePage() {
     const [resumeDownloadUrl, setResumeDownloadUrl] = useState(null);
     const [avatarUrl, setAvatarUrl] = useState("");
     const [isEditing, setIsEditing] = useState(false);
+    const [showResumePreview, setShowResumePreview] = useState(false);
     useEffect(() => {
         async function loadProfile() {
             if (!user)
@@ -204,6 +205,7 @@ function StudentProfilePage() {
                 const signedUrl = await getSignedResumeUrl(filePath, supabase);
                 if (signedUrl) {
                     setResumeDownloadUrl(signedUrl);
+                    setShowResumePreview(true);
                 }
                 toast.success("Resume document uploaded!");
             }
@@ -494,14 +496,22 @@ function StudentProfilePage() {
     </span>
 
     {resumeDownloadUrl ? (
-      <a
-        href={resumeDownloadUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-sm text-blue-600 underline"
-      >
-        View Resume
-      </a>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => setShowResumePreview(true)}
+          className="text-sm text-blue-600 hover:underline"
+        >
+          Preview
+        </button>
+        <a
+          href={resumeDownloadUrl}
+          download
+          className="text-sm text-blue-600 hover:underline"
+        >
+          Download
+        </a>
+      </div>
     ) : (
       <span className="text-sm text-muted-foreground">Preparing link...</span>
     )}
@@ -552,5 +562,28 @@ function StudentProfilePage() {
           </Button>
         )}
       </form>
+      
+      {/* Resume Preview Modal */}
+      {!resumeDownloadUrl || !showResumePreview ? null : (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowResumePreview(false)} />
+          <div className="relative w-full max-w-4xl h-[90vh] bg-background rounded-lg shadow-lg overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="font-bold text-lg">Resume Preview</h3>
+              <button
+                onClick={() => setShowResumePreview(false)}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <iframe
+              src={resumeDownloadUrl}
+              className="w-full h-full"
+              title="Resume Preview"
+            />
+          </div>
+        </div>
+      )}
     </div>);
 }
