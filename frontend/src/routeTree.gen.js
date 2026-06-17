@@ -18,6 +18,7 @@ import { Route as AuthenticatedStudentApplicationsRouteImport } from "./routes/_
 import { Route as AuthenticatedCompanyProfileRouteImport } from "./routes/_authenticated.company.profile";
 import { Route as AuthenticatedCompanyPostsRouteImport } from "./routes/_authenticated.company.posts";
 import { Route as AuthenticatedCompanyApplicationsRouteImport } from "./routes/_authenticated.company.applications";
+import { Route as AuthenticatedCompanyScholarsRouteImport } from "./routes/_authenticated.company.scholars";
 import { Route as AuthenticatedAdminAnalyticsRouteImport } from "./routes/_authenticated.admin.analytics";
 import { Route as AuthenticatedStudentJobsIndexRouteImport } from "./routes/_authenticated.student.jobs.index";
 import { Route as AuthenticatedAdminStudentsIndexRouteImport } from "./routes/_authenticated.admin.students.index";
@@ -122,6 +123,11 @@ const AuthenticatedCompanyApplicationsRoute = AuthenticatedCompanyApplicationsRo
   path: "/company/applications",
   getParentRoute: () => AuthenticatedRoute,
 });
+const AuthenticatedCompanyScholarsRoute = AuthenticatedCompanyScholarsRouteImport.update({
+  id: "/company/scholars",
+  path: "/company/scholars",
+  getParentRoute: () => AuthenticatedRoute,
+});
 
 const AuthenticatedAdminAnalyticsRoute = AuthenticatedAdminAnalyticsRouteImport.update({
   id: "/admin/analytics",
@@ -181,6 +187,7 @@ const AuthenticatedRouteChildren = {
   AuthenticatedDashboardRoute,
   AuthenticatedSettingsRoute,
   AuthenticatedAdminAnalyticsRoute,
+  AuthenticatedCompanyScholarsRoute,
   AuthenticatedCompanyApplicationsRoute,
   AuthenticatedCompanyPostsRoute,
   AuthenticatedCompanyProfileRoute,
