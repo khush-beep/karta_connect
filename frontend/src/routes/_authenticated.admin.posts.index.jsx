@@ -7,7 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
 import { Briefcase, GraduationCap, Search, Trash2, Loader2, MapPin, Calendar, Power, PowerOff, FileText, ChevronRight } from "lucide-react";
+import { requireAdmin } from "@/lib/route-guards";
 export const Route = createFileRoute("/_authenticated/admin/posts/")({
+    beforeLoad: requireAdmin,
     component: AdminPostsPage,
 });
 function AdminPostsPage() {
