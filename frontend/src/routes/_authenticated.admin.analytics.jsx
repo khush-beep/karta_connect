@@ -2,15 +2,19 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
-import { TrendingUp, Users, Building2, Briefcase, Loader2, GraduationCap } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from "recharts";
+import { TrendingUp, Users, Building2, Briefcase, Loader2, GraduationCap, MapPin, Layers, LineChart as LineChartIcon } from "lucide-react";
 import { toast } from "sonner";
 import { requireAdmin } from "@/lib/route-guards";
 export const Route = createFileRoute("/_authenticated/admin/analytics")({
     beforeLoad: requireAdmin,
     component: AdminAnalytics,
 });
-const PIE_COLORS = ["#e2b13c", "#3b82f6", "#10b981", "#8b5cf6", "#ec4899"];
+const PIE_COLORS = [
+    "#e2b13c", "#3b82f6", "#10b981", "#8b5cf6", "#ec4899",
+    "#f97316", "#14b8a6", "#6366f1", "#d946ef", "#f43f5e",
+    "#84cc16", "#06b6d4", "#a855f7", "#ef4444", "#eab308"
+];
 function AdminAnalytics() {
     const [loading, setLoading] = useState(true);
     const [isMounted, setIsMounted] = useState(false);
@@ -26,14 +30,18 @@ function AdminAnalytics() {
         selectedInternships: 0,
     });
     const [pipelineData, setPipelineData] = useState([]);
+    const [domainData, setDomainData] = useState([]);
+    const [courseData, setCourseData] = useState([]);
+    const [regionData, setRegionData] = useState([]);
+    const [userGrowthData, setUserGrowthData] = useState([]);
     async function loadData() {
         setLoading(true);
         try {
             const [studentsRes, whitelistRes, companiesRes, jobsRes, appsRes] = await Promise.all([
-                supabase.from("student_profiles").select("user_id, created_at"),
+                supabase.from("student_profiles").select("user_id, created_at, course, location"),
                 supabase.from("student_whitelist").select("id"),
-                supabase.from("companies").select("id, name"),
-                supabase.from("job_posts").select("id, type, company_id"),
+                supabase.from("companies").select("id, name, industry, location, created_at"),
+                supabase.from("job_posts").select("id, type, company_id, location"),
                 supabase.from("applications").select("id, status, applied_at, job_post:job_posts(type)")
             ]);
             if (studentsRes.error)
@@ -82,6 +90,46 @@ function AdminAnalytics() {
                     Internships: selectedInternships,
                 }
             ]);
+
+            // Analytics by Domain (Industry for companies)
+            const dCounts = {};
+            cData.forEach(c => { if (c.industry) { dCounts[c.industry] = (dCounts[c.industry] || 0) + 1; } });
+            const dArr = Object.keys(dCounts).map(k => ({ name: k, value: dCounts[k] })).sort((a,b)=>b.value-a.value).slice(0, 6);
+            setDomainData(dArr);
+
+            // Analytics by Course (For students)
+            const courseCounts = {};
+            sData.forEach(s => { if (s.course) { courseCounts[s.course] = (courseCounts[s.course] || 0) + 1; } });
+            const courseArr = Object.keys(courseCounts).map(k => ({ name: k, value: courseCounts[k] })).sort((a,b)=>b.value-a.value).slice(0, 6);
+            setCourseData(courseArr);
+
+            // Analytics by Region (Location)
+            const rCounts = {};
+            [...cData, ...sData, ...jData].forEach(item => {
+                if (item.location) { 
+                    const loc = item.location.trim().toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+                    rCounts[loc] = (rCounts[loc] || 0) + 1; 
+                }
+            });
+            const rArr = Object.keys(rCounts).map(k => ({ name: k, value: rCounts[k] })).sort((a,b)=>b.value-a.value).slice(0, 6);
+            setRegionData(rArr);
+
+            // Analytics by User (Growth over time by month)
+            const userGrowthMap = {};
+            const processGrowth = (items, type) => {
+                items.forEach(item => {
+                    if (item.created_at) {
+                        const date = new Date(item.created_at);
+                        const month = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                        if (!userGrowthMap[month]) userGrowthMap[month] = { month, students: 0, companies: 0 };
+                        userGrowthMap[month][type]++;
+                    }
+                });
+            };
+            processGrowth(sData, 'students');
+            processGrowth(cData, 'companies');
+            const gArr = Object.values(userGrowthMap).sort((a,b) => a.month.localeCompare(b.month));
+            setUserGrowthData(gArr);
         }
         catch (err) {
             console.error("Error calculating analytics:", err);
@@ -199,24 +247,140 @@ function AdminAnalytics() {
       </div>
 
       {/* Comparison Chart */}
-      {isMounted && (<Card className="shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-lg font-bold">Jobs vs. Internships Pipeline Comparison</CardTitle>
-            <CardDescription>Comparative visualization of student application counts and successful selections.</CardDescription>
-          </CardHeader>
-          <CardContent className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={pipelineData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" opacity={0.3}/>
-                <XAxis dataKey="name" stroke="#888888" fontSize={12} tickLine={false} axisLine={false}/>
-                <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false}/>
-                <Tooltip cursor={{ fill: "rgba(0,0,0,0.03)" }}/>
-                <Legend />
-                <Bar dataKey="Jobs" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={40}/>
-                <Bar dataKey="Internships" fill="#8b5cf6" radius={[4, 4, 0, 0]} barSize={40}/>
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>)}
+      {isMounted && (
+        <div className="grid gap-6 md:grid-cols-2">
+          <Card className="shadow-sm md:col-span-2">
+            <CardHeader>
+              <CardTitle className="text-lg font-bold">Jobs vs. Internships Pipeline Comparison</CardTitle>
+              <CardDescription>Comparative visualization of student application counts and successful selections.</CardDescription>
+            </CardHeader>
+            <CardContent className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={pipelineData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.3}/>
+                  <XAxis dataKey="name" stroke="#888888" fontSize={12} tickLine={false} axisLine={false}/>
+                  <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false}/>
+                  <Tooltip cursor={{ fill: "rgba(0,0,0,0.03)" }}/>
+                  <Legend />
+                  <Bar dataKey="Jobs" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={40}/>
+                  <Bar dataKey="Internships" fill="#8b5cf6" radius={[4, 4, 0, 0]} barSize={40}/>
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          {/* User Registration Growth */}
+          <Card className="shadow-sm md:col-span-2">
+            <CardHeader>
+              <CardTitle className="text-lg font-bold flex items-center gap-2">
+                <LineChartIcon className="h-5 w-5 text-indigo-500" /> User Growth Analytics
+              </CardTitle>
+              <CardDescription>Monthly registrations for scholars and corporate partners.</CardDescription>
+            </CardHeader>
+            <CardContent className="h-80">
+              {userGrowthData.length === 0 ? (
+                <div className="h-full flex items-center justify-center text-sm text-muted-foreground">Not enough data to display.</div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={userGrowthData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                    <XAxis dataKey="month" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
+                    <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
+                    <Tooltip />
+                    <Legend />
+                    <Line type="monotone" dataKey="students" name="Scholars" stroke="#3b82f6" strokeWidth={2} activeDot={{ r: 8 }} />
+                    <Line type="monotone" dataKey="companies" name="Partners" stroke="#10b981" strokeWidth={2} activeDot={{ r: 8 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Region Analytics */}
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-lg font-bold flex items-center gap-2">
+                <MapPin className="h-5 w-5 text-orange-500" /> Regional Distribution
+              </CardTitle>
+              <CardDescription>Top locations based on users and job postings.</CardDescription>
+            </CardHeader>
+            <CardContent className="h-[300px]">
+              {regionData.length === 0 ? (
+                <div className="h-full flex items-center justify-center text-sm text-muted-foreground">Not enough location data.</div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={regionData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
+                      {regionData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Domain/Industry Analytics */}
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-lg font-bold flex items-center gap-2">
+                <Building2 className="h-5 w-5 text-pink-500" /> Company Industry Focus
+              </CardTitle>
+              <CardDescription>Top industries for registered corporate partners.</CardDescription>
+            </CardHeader>
+            <CardContent className="h-[300px]">
+              {domainData.length === 0 ? (
+                <div className="h-full flex items-center justify-center text-sm text-muted-foreground">Not enough industry data.</div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={domainData} layout="vertical" margin={{ top: 0, right: 0, left: 20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" opacity={0.3} horizontal={true} vertical={false}/>
+                    <XAxis type="number" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
+                    <YAxis dataKey="name" type="category" stroke="#888888" fontSize={11} tickLine={false} axisLine={false} width={150} tickFormatter={(value) => value.length > 20 ? value.substring(0, 20) + '...' : value} />
+                    <Tooltip cursor={{ fill: "rgba(0,0,0,0.03)" }}/>
+                    <Bar dataKey="value" fill="#ec4899" radius={[0, 4, 4, 0]} barSize={20} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Scholar Course Analytics */}
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-lg font-bold flex items-center gap-2">
+                <GraduationCap className="h-5 w-5 text-cyan-500" /> Scholar Course Distribution
+              </CardTitle>
+              <CardDescription>Top academic courses pursued by registered scholars.</CardDescription>
+            </CardHeader>
+            <CardContent className="h-[300px]">
+              {courseData.length === 0 ? (
+                <div className="h-full flex items-center justify-center text-sm text-muted-foreground">Not enough course data.</div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={courseData} layout="vertical" margin={{ top: 0, right: 0, left: 20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" opacity={0.3} horizontal={true} vertical={false}/>
+                    <XAxis type="number" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
+                    <YAxis dataKey="name" type="category" stroke="#888888" fontSize={11} tickLine={false} axisLine={false} width={150} tickFormatter={(value) => value.length > 20 ? value.substring(0, 20) + '...' : value} />
+                    <Tooltip cursor={{ fill: "rgba(0,0,0,0.03)" }}/>
+                    <Bar dataKey="value" fill="#06b6d4" radius={[0, 4, 4, 0]} barSize={20} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>);
 }

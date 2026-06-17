@@ -1,0 +1,33 @@
+{
+  "name": "karta_connect",
+  "version": "1.0.0",
+  "description": "Karta Connect is a professional talent and networking portal built for **Karta Scholars**, partner companies, NGOs, and the Karta Team. The platform facilitates whitelisted student registration, profile customization, resume hosting, opportunity publication, and job applications.",
+  "main": "index.html",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspaces",
+    "dev:frontend": "npm run dev --workspace=frontend",
+    "dev:backend": "npm run start --workspace=backend",
+    "start": "npm run dev:backend & npm run dev:frontend",
+    "build": "npm run build --workspaces",
+    "build:frontend": "npm run build --workspace=frontend",
+    "build:backend": "echo 'Backend does not require build'",
+    "lint": "npm run lint --workspaces",
+    "format": "npm run format --workspaces",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/khush-beep/karta_connect.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/khush-beep/karta_connect/issues"
+  },
+  "homepage": "https://github.com/khush-beep/karta_connect#readme"
+}

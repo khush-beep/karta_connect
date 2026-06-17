@@ -164,7 +164,7 @@ function AdminDashboard() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <UserCheck className="h-5 w-5 text-primary"/> Whitelist Student
+              <UserCheck className="h-5 w-5 text-primary"/> Add Student
             </CardTitle>
             <CardDescription>Authorize a student email so they can create an account.</CardDescription>
           </CardHeader>

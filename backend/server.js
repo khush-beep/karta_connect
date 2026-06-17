@@ -1,48 +1,71 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const multer = require('multer');
 const ws = require('ws');
 globalThis.WebSocket = ws;
 
-const { createClient } = require('@supabase/supabase-js');
+const { createClient } = require("@supabase/supabase-js");
 
 // Load environment variables from the parent directory's .env file
-require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Configure CORS to allow access from the frontend
-app.use(cors({
-  origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
-  credentials: true
-}));
+app.use(
+  cors({
+    origin: ["http://localhost:5173", "http://127.0.0.1:5173"],
+    credentials: true,
+  }),
+);
 
 app.use(express.json());
+app.use('/uploads', express.static('uploads'));
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'uploads/resumes');
+  },
+  filename: (req, file, cb) => {
+    cb(null, Date.now() + '-' + file.originalname);
+  }
+}); // OR your existing storage if already using
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
+const fileFilter = (req, file, cb) => {
+  if (file.mimetype === 'application/pdf') {
+    cb(null, true);
+  } else {
+    cb(new Error('Only PDF files are allowed'), false);
+  }
+};
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('CRITICAL ERROR: Supabase environment variables are missing in .env!');
+const upload = multer({
+  storage,
+  fileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB
+  }
+});
+
+const supabaseUrl = process.env.VITE_SUPABASE_URL || "";
+
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+
+if (!supabaseUrl || !supabaseServiceRoleKey) {
+  console.error(
+    "CRITICAL ERROR: Supabase URL or Service Role Key missing in .env!",
+  );
 }
 
-// Helper to get an authenticated admin client bypassing RLS policies
-async function getAdminClient() {
-  const client = createClient(supabaseUrl, supabaseAnonKey, {
-    auth: { persistSession: false }
+// Helper to get an admin client that bypasses RLS
+
+function getAdminClient() {
+  return createClient(supabaseUrl, supabaseServiceRoleKey, {
+    auth: {
+      persistSession: false,
+    },
   });
-
-  const { error } = await client.auth.signInWithPassword({
-    email: 'admin@karta.com',
-    password: 'Admin@123'
-  });
-
-  if (error) {
-    throw new Error(`Failed to authenticate admin client: ${error.message}`);
-  }
-
-  return client;
 }
 
 // Middleware to verify JWT and attach user info to request
@@ -109,74 +132,76 @@ function requireStudentRole(req, res, next) {
 
 
 // 1. Resolve Login Route
-app.post('/api/auth/resolve-login', async (req, res) => {
+app.post("/api/auth/resolve-login", async (req, res) => {
   const { email } = req.body;
   if (!email) {
-    return res.status(400).json({ error: 'Email parameter is required.' });
+    return res.status(400).json({ error: "Email parameter is required." });
   }
 
   const cleanEmail = email.toLowerCase().trim();
 
-  if (cleanEmail === 'admin@karta.com') {
-    return res.json({ kind: 'admin', hasPassword: true });
+  if (cleanEmail === "admin@karta.com") {
+    return res.json({ kind: "admin", hasPassword: true });
   }
 
   try {
-    const adminClient = await getAdminClient();
+    const adminClient = getAdminClient();
 
     // Check student_profiles
     const { data: studentProfile } = await adminClient
-      .from('student_profiles')
-      .select('user_id')
-      .eq('email', cleanEmail)
+      .from("student_profiles")
+      .select("user_id")
+      .eq("email", cleanEmail)
       .maybeSingle();
 
     if (studentProfile) {
-      return res.json({ kind: 'student', hasPassword: true });
+      return res.json({ kind: "student", hasPassword: true });
     }
 
     // Check if whitelisted student
     const { data: whitelistedStudent } = await adminClient
-      .from('student_whitelist')
-      .select('id')
-      .eq('email', cleanEmail)
-      .eq('used', false)
+      .from("student_whitelist")
+      .select("id")
+      .eq("email", cleanEmail)
+      .eq("used", false)
       .maybeSingle();
 
     if (whitelistedStudent) {
-      return res.json({ kind: 'student', hasPassword: false });
+      return res.json({ kind: "student", hasPassword: false });
     }
 
     // Check company
     const { data: company } = await adminClient
-      .from('companies')
-      .select('owner_user_id')
-      .eq('contact_email', cleanEmail)
+      .from("companies")
+      .select("owner_user_id")
+      .eq("contact_email", cleanEmail)
       .maybeSingle();
 
     if (company) {
       const hasPassword = company.owner_user_id !== null;
-      return res.json({ kind: 'company', hasPassword });
+      return res.json({ kind: "company", hasPassword });
     }
 
     return res.json({ kind: null, hasPassword: false });
   } catch (err) {
-    console.error('Error resolving login:', err);
-    return res.status(500).json({ error: 'Internal server error resolving email.' });
+    console.error("Error resolving login:", err);
+    return res
+      .status(500)
+      .json({ error: "Internal server error resolving email." });
   }
 });
 
 // 2. Signup / Create Password Route
-app.post('/api/auth/signup', async (req, res) => {
+app.post("/api/auth/signup", async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
-    return res.status(400).json({ error: 'Email and password are required.' });
+    return res.status(400).json({ error: "Email and password are required." });
   }
 
   const cleanEmail = email.toLowerCase().trim();
 
   try {
-    const adminClient = await getAdminClient();
+    const adminClient = getAdminClient();
 
     let role = null;
     let whitelistRow = null;
@@ -184,49 +209,100 @@ app.post('/api/auth/signup', async (req, res) => {
 
     // Check whitelist
     const { data: wlStudent } = await adminClient
-      .from('student_whitelist')
-      .select('*')
-      .eq('email', cleanEmail)
-      .eq('used', false)
+      .from("student_whitelist")
+      .select("*")
+      .eq("email", cleanEmail)
+      .eq("used", false)
       .maybeSingle();
 
     if (wlStudent) {
-      role = 'student';
+      role = "student";
       whitelistRow = wlStudent;
     } else {
       // Check company
       const { data: comp } = await adminClient
-        .from('companies')
-        .select('*')
-        .eq('contact_email', cleanEmail)
+        .from("companies")
+        .select("*")
+        .eq("contact_email", cleanEmail)
         .maybeSingle();
 
       if (comp && comp.owner_user_id === null) {
-        role = 'company';
+        role = "company";
         companyRow = comp;
       }
     }
 
     if (!role) {
-      return res.status(400).json({ error: 'Email is not whitelisted or already registered.' });
+      return res
+        .status(400)
+        .json({ error: "Email is not whitelisted or already registered." });
     }
 
     // Auth signUp
-    const { data: authData, error: signUpError } = await adminClient.auth.signUp({
+    const { data: existingUsers } = await adminClient.auth.admin.listUsers();
+
+    const existingUser = existingUsers.users.find(
+      (u) => u.email === cleanEmail,
+    );
+
+    if (existingUser) {
+      throw new Error("This account already exists. Please login instead.");
+    }
+    const { data: authData, error: signUpError } =
+      await adminClient.auth.admin.createUser({
+        email: cleanEmail,
+        password: password,
+        email_confirm: true,
+      });
+
+    console.log("CREATED USER:", authData.user);
+    console.log("EMAIL CONFIRMED AT:", authData.user?.email_confirmed_at);
+
+    console.log(authData.user);
+
+    console.log("AUTH DATA:", authData);
+    console.log("SIGNUP ERROR:", signUpError);
+    // Auth signUp using a dedicated client for the new user so they can insert their own roles/profile
+    const newUserClient = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: { persistSession: false }
+    });
+
+    const { data: authData, error: signUpError } = await newUserClient.auth.signUp({
       email: cleanEmail,
       password: password
     });
 
     if (signUpError || !authData.user) {
-      throw new Error(signUpError ? signUpError.message : 'Failed to create auth user.');
+      throw new Error(
+        signUpError ? signUpError.message : "Failed to create auth user.",
+      );
     }
 
-    const newUserId = authData.user.id;
+    const newUserId = authData.user?.id;
 
-    // Assign role
-    const { error: roleError } = await adminClient.from('user_roles').insert({
+    console.log("NEW USER ID:", newUserId);
+
+    const { data: authUser } = await adminClient.from("user_roles").select("*");
+
+    console.log("ROLE CHECK:", authUser);
+
+    console.log("NEW USER ID:", newUserId);
+
+    // Explicitly sign in as the new user to ensure the session is active for RLS
+    if (!authData.session) {
+      const { error: signInErr } = await newUserClient.auth.signInWithPassword({
+        email: cleanEmail,
+        password: password
+      });
+      if (signInErr) {
+        throw new Error(`Failed to sign in new user for RLS: ${signInErr.message}`);
+      }
+    }
+
+    // Assign role using the newUserClient because RLS policy says auth.uid() = user_id
+    const { error: roleError } = await newUserClient.from('user_roles').insert({
       user_id: newUserId,
-      role: role
+      role: role,
     });
 
     if (roleError) {
@@ -235,7 +311,7 @@ app.post('/api/auth/signup', async (req, res) => {
 
     // Save profile details
     if (role === 'student' && whitelistRow) {
-      const { error: profileError } = await adminClient.from('student_profiles').insert({
+      const { error: profileError } = await newUserClient.from('student_profiles').insert({
         user_id: newUserId,
         name: whitelistRow.name || '',
         email: cleanEmail,
@@ -249,28 +325,36 @@ app.post('/api/auth/signup', async (req, res) => {
       });
 
       if (profileError) {
-        throw new Error(`Failed to create student profile: ${profileError.message}`);
+        throw new Error(
+          `Failed to create student profile: ${profileError.message}`,
+        );
       }
 
+      // Update whitelist using adminClient because new user does not have permission
       await adminClient
-        .from('student_whitelist')
+        .from("student_whitelist")
         .update({ used: true })
         .eq('id', whitelistRow.id);
     } else if (role === 'company' && companyRow) {
+      // Update company link using adminClient because new user does not own the company yet
       const { error: companyLinkError } = await adminClient
-        .from('companies')
+        .from("companies")
         .update({ owner_user_id: newUserId })
-        .eq('id', companyRow.id);
+        .eq("id", companyRow.id);
 
       if (companyLinkError) {
-        throw new Error(`Failed to link company profile: ${companyLinkError.message}`);
+        throw new Error(
+          `Failed to link company profile: ${companyLinkError.message}`,
+        );
       }
     }
 
     return res.json({ success: true });
   } catch (err) {
-    console.error('Signup error:', err);
-    return res.status(500).json({ error: err.message || 'Failed to complete signup.' });
+    console.error("Signup error:", err);
+    return res
+      .status(500)
+      .json({ error: err.message || "Failed to complete signup." });
   }
 });
 
@@ -284,25 +368,31 @@ app.post('/api/account/delete', authMiddleware, async (req, res) => {
   }
 
   if (!userId) {
-    return res.status(400).json({ error: 'User ID is required.' });
+    return res.status(400).json({ error: "User ID is required." });
   }
 
   try {
-    const adminClient = await getAdminClient();
+    const adminClient = getAdminClient();
 
     // Clear roles and profile
-    await adminClient.from('user_roles').delete().eq('user_id', userId);
-    await adminClient.from('student_profiles').delete().eq('user_id', userId);
-    await adminClient.from('companies').update({ owner_user_id: null }).eq('owner_user_id', userId);
+    await adminClient.from("user_roles").delete().eq("user_id", userId);
+    await adminClient.from("student_profiles").delete().eq("user_id", userId);
+    await adminClient
+      .from("companies")
+      .update({ owner_user_id: null })
+      .eq("owner_user_id", userId);
 
     // Delete auth account
-    const { error: deleteError } = await adminClient.auth.admin.deleteUser(userId);
+    const { error: deleteError } =
+      await adminClient.auth.admin.deleteUser(userId);
     if (deleteError) throw deleteError;
 
     return res.json({ success: true });
   } catch (err) {
-    console.error('Delete account error:', err);
-    return res.status(500).json({ error: err.message || 'Failed to delete account.' });
+    console.error("Delete account error:", err);
+    return res
+      .status(500)
+      .json({ error: err.message || "Failed to delete account." });
   }
 });
 
@@ -310,26 +400,95 @@ app.post('/api/account/delete', authMiddleware, async (req, res) => {
 app.post('/api/admin/delete-student', authMiddleware, requireAdminRole, async (req, res) => {
   const { userId, email } = req.body;
   if (!userId || !email) {
-    return res.status(400).json({ error: 'User ID and email parameters are required.' });
+    return res
+      .status(400)
+      .json({ error: "User ID and email parameters are required." });
   }
 
   try {
-    const adminClient = await getAdminClient();
+    const adminClient = getAdminClient();
 
     // Delete dependencies first
-    await adminClient.from('applications').delete().eq('student_id', userId);
-    await adminClient.from('student_profiles').delete().eq('user_id', userId);
-    await adminClient.from('student_whitelist').delete().eq('email', email.toLowerCase().trim());
-    await adminClient.from('user_roles').delete().eq('user_id', userId);
+    await adminClient.from("applications").delete().eq("student_id", userId);
+    await adminClient.from("student_profiles").delete().eq("user_id", userId);
+    await adminClient
+      .from("student_whitelist")
+      .delete()
+      .eq("email", email.toLowerCase().trim());
+    await adminClient.from("user_roles").delete().eq("user_id", userId);
 
     // Delete auth user
-    const { error: deleteError } = await adminClient.auth.admin.deleteUser(userId);
+    const { error: deleteError } =
+      await adminClient.auth.admin.deleteUser(userId);
     if (deleteError) throw deleteError;
 
     return res.json({ success: true });
   } catch (err) {
-    console.error('Admin delete student error:', err);
-    return res.status(500).json({ error: err.message || 'Failed to delete student.' });
+    console.error("Admin delete student error:", err);
+    return res
+      .status(500)
+      .json({ error: err.message || "Failed to delete student." });
+  }
+});
+
+// 5. Admin Bulk Upload Route
+app.post('/api/admin/bulk-upload-whitelist', async (req, res) => {
+  const { records } = req.body;
+  if (!records || !Array.isArray(records)) {
+    return res.status(400).json({ error: 'Records array is required.' });
+  }
+
+  try {
+    const adminClient = await getAdminClient();
+    
+    // Check existing emails
+    const [profilesRes, whitelistRes] = await Promise.all([
+      adminClient.from('student_profiles').select('email'),
+      adminClient.from('student_whitelist').select('email')
+    ]);
+
+    const existingEmails = new Set([
+      ...(profilesRes.data || []).map(p => p.email.toLowerCase()),
+      ...(whitelistRes.data || []).map(w => w.email.toLowerCase())
+    ]);
+
+    const recordsToInsert = [];
+    let skipped = 0;
+
+    for (const row of records) {
+      const email = row.email?.toString().trim().toLowerCase();
+      if (!email) continue;
+      
+      if (existingEmails.has(email)) {
+        skipped++;
+        continue;
+      }
+      
+      recordsToInsert.push(row);
+      existingEmails.add(email);
+    }
+
+    if (recordsToInsert.length === 0) {
+      return res.json({ success: true, inserted: 0, skipped });
+    }
+
+    // Insert individually to avoid any RLS caching issues
+    let inserted = 0;
+    let failed = 0;
+    for (const record of recordsToInsert) {
+      const { error } = await adminClient.from('student_whitelist').insert(record);
+      if (error) {
+        console.error('Failed to insert record:', record.email, error);
+        failed++;
+      } else {
+        inserted++;
+      }
+    }
+
+    return res.json({ success: true, inserted, skipped, failed });
+  } catch (err) {
+    console.error('Bulk upload error:', err);
+    return res.status(500).json({ error: err.message || 'Failed to bulk upload.' });
   }
 });
 
@@ -587,8 +746,8 @@ app.post('/api/student/applications', authMiddleware, requireStudentRole, async 
 });
 
 // Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', time: new Date() });
+app.get("/health", (req, res) => {
+  res.json({ status: "ok", time: new Date() });
 });
 
 app.listen(PORT, () => {
