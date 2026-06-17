@@ -1,5 +1,9 @@
 # Karta Connect — Scholar Talent & Networking Platform
 
+
+
+
+
 Karta Connect is a professional talent and networking portal built for **Karta Scholars**, partner companies, NGOs, and the Karta Team. The platform facilitates whitelisted student registration, profile customization, resume hosting, opportunity publication, and job applications.
 
 ---
