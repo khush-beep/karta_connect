@@ -7,7 +7,9 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Briefcase, Search, MapPin, Calendar, ChevronRight, Loader2, Filter } from "lucide-react";
 import { toast } from "sonner";
+import { requireStudent } from "@/lib/route-guards";
 export const Route = createFileRoute("/_authenticated/student/jobs/")({
+    beforeLoad: requireStudent,
     validateSearch: (search) => {
         return {
             type: search.type || undefined,

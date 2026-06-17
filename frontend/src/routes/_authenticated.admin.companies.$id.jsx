@@ -6,7 +6,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
 import { Building2, ArrowLeft, Globe, Mail, Phone, MapPin, Briefcase, Users, FileText, CheckCircle2, Loader2, Trash2 } from "lucide-react";
+import { requireAdmin } from "@/lib/route-guards";
 export const Route = createFileRoute("/_authenticated/admin/companies/$id")({
+    beforeLoad: requireAdmin,
     component: AdminCompanyDetails,
 });
 function AdminCompanyDetails() {
