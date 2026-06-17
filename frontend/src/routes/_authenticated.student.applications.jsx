@@ -5,7 +5,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FileText, Briefcase, Calendar, Info, Loader2 } from "lucide-react";
+import { requireStudent } from "@/lib/route-guards";
 export const Route = createFileRoute("/_authenticated/student/applications")({
+    beforeLoad: requireStudent,
     component: StudentApplicationsPage,
 });
 function StudentApplicationsPage() {

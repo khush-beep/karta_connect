@@ -5,8 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Loader2, ArrowLeft, User, BookOpen, Award, FileText, ExternalLink, ShieldCheck, ShieldAlert } from "lucide-react";
+import { requireAdmin } from "@/lib/route-guards";
 export const Route = createFileRoute("/_authenticated/admin/students/$id")({
-  component: AdminStudentProfileDetailsPage,
+    beforeLoad: requireAdmin,
+    component: AdminStudentProfileDetailsPage,
 });
  async function getResumeUrl(filePath) {
         if (!filePath) return "";

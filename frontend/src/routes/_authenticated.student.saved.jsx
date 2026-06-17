@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { toast } from "sonner";
 import { Briefcase, Bookmark, Loader2 } from "lucide-react";
 export const Route = createFileRoute("/_authenticated/student/saved")({
+    beforeLoad: requireStudent,
     component: SavedPosts,
 });
 function SavedPosts() {

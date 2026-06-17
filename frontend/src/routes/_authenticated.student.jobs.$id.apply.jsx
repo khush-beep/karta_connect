@@ -7,7 +7,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { ArrowLeft, Briefcase, FileText, Loader2, Send, AlertTriangle } from "lucide-react";
+import { requireStudent } from "@/lib/route-guards";
 export const Route = createFileRoute("/_authenticated/student/jobs/$id/apply")({
+    beforeLoad: requireStudent,
     component: JobApplyPage,
 });
 function JobApplyPage() {
