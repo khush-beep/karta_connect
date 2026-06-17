@@ -14,6 +14,7 @@ function StudentApplicationsPage() {
     const { user } = useAuth();
     const [apps, setApps] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [statusFilter, setStatusFilter] = useState("");
     useEffect(() => {
         async function loadApplications() {
             if (!user)
@@ -50,15 +51,30 @@ function StudentApplicationsPage() {
         rejected: "bg-destructive/10 text-destructive border-destructive/20"
     };
     const statusLabels = {
-        applied: "Applied",
-        review: "Under Review",
-        selected: "Selected",
-        rejected: "Rejected"
+      applied: "Applied",
+      review: "Under Review",
+      selected: "Shortlisted",
+      rejected: "Rejected"
     };
     return (<div className="space-y-8 animate-in fade-in duration-500">
       <div>
         <h1 className="text-3xl font-extrabold tracking-tight">My Applications</h1>
         <p className="text-muted-foreground">Monitor the status of your submissions to corporate partners.</p>
+      </div>
+
+      {/* Status filter pills */}
+      <div className="flex items-center gap-2">
+        {[
+          { key: "", label: "All", style: "bg-muted" },
+          { key: "applied", label: statusLabels.applied, style: "bg-blue-50 text-blue-600" },
+          { key: "review", label: statusLabels.review, style: "bg-amber-50 text-amber-600" },
+          { key: "selected", label: statusLabels.selected, style: "bg-emerald-50 text-emerald-600" },
+          { key: "rejected", label: statusLabels.rejected, style: "bg-destructive/10 text-destructive" },
+        ].map((s) => (
+          <button key={s.key} onClick={() => setStatusFilter(prev => prev === s.key ? "" : s.key)} className={`text-xs px-3 py-1 rounded-full font-semibold border ${statusFilter === s.key ? "ring-2 ring-offset-1 ring-primary" : ""} ${s.style}`}>
+            {s.label}
+          </button>
+        ))}
       </div>
 
       {apps.length === 0 ? (<Card className="border-dashed py-12 text-center max-w-xl mx-auto">
@@ -71,7 +87,7 @@ function StudentApplicationsPage() {
             <Link to="/student/jobs" search={{}}><Button>Find verified jobs</Button></Link>
           </CardContent>
         </Card>) : (<div className="space-y-4 max-w-3xl">
-          {apps.map((app) => (<Card key={app.id} className="hover:shadow-sm transition-shadow">
+          {apps.filter(a => !statusFilter || a.status === statusFilter).map((app) => (<Card key={app.id} className="hover:shadow-sm transition-shadow">
               <CardContent className="p-6">
                 <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
                   <div className="flex gap-4">

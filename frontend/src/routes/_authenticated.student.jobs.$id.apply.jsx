@@ -18,6 +18,7 @@ function JobApplyPage() {
     const navigate = useNavigate();
     const [job, setJob] = useState(null);
     const [profile, setProfile] = useState(null);
+    const [existingApplication, setExistingApplication] = useState(null);
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     // Form input
@@ -28,7 +29,7 @@ function JobApplyPage() {
                 return;
             setLoading(true);
             try {
-                const [jobRes, profileRes] = await Promise.all([
+                const [jobRes, profileRes, applicationRes] = await Promise.all([
                     supabase
                         .from("job_posts")
                         .select("*, company:companies(name)")
@@ -38,12 +39,20 @@ function JobApplyPage() {
                         .from("student_profiles")
                         .select("*")
                         .eq("user_id", user.id)
-                        .maybeSingle()
+                        .maybeSingle(),
+                    supabase
+                        .from("applications")
+                        .select("*")
+                        .eq("student_id", user.id)
+                        .eq("post_id", jobId)
+                        .maybeSingle(),
                 ]);
                 if (jobRes.data)
                     setJob(jobRes.data);
                 if (profileRes.data)
                     setProfile(profileRes.data);
+                if (applicationRes.data)
+                    setExistingApplication(applicationRes.data);
             }
             catch (err) {
                 console.error("Error loading application setup data:", err);
@@ -57,7 +66,7 @@ function JobApplyPage() {
     }, [user, jobId]);
     async function handleSubmit(e) {
         e.preventDefault();
-        if (!user || !jobId)
+        if (!user || !jobId || existingApplication)
             return;
         if (!profile?.name || !profile?.university || !profile?.course) {
             toast.error("Please fill required fields in your profile first.");
@@ -65,6 +74,10 @@ function JobApplyPage() {
         }
         if (!profile?.resume_url) {
             toast.error("Please upload a resume in your profile page before applying.");
+            return;
+        }
+        if (existingApplication) {
+            toast.error("You have already applied to this posting.");
             return;
         }
         setSubmitting(true);
@@ -169,12 +182,15 @@ function JobApplyPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {existingApplication && (<div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-sm text-emerald-900">
+                You have already applied to this role. Current application status: <span className="font-semibold">{existingApplication.status}</span>.
+              </div>)}
             <div className="grid gap-2">
               <Label htmlFor="cover-note">Motivation / Cover Note (Optional)</Label>
-              <textarea id="cover-note" placeholder="Describe why you are interested in this role and why you are a good fit..." value={coverNote} onChange={(e) => setCoverNote(e.target.value)} className="flex min-h-[140px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" disabled={isProfileIncomplete || isResumeMissing}/>
+              <textarea id="cover-note" placeholder="Describe why you are interested in this role and why you are a good fit..." value={coverNote} onChange={(e) => setCoverNote(e.target.value)} className="flex min-h-[140px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" disabled={isProfileIncomplete || isResumeMissing || !!existingApplication}/>
             </div>
 
-            <Button type="submit" className="w-full flex items-center justify-center gap-2" disabled={submitting || isProfileIncomplete || isResumeMissing}>
+            <Button type="submit" className="w-full flex items-center justify-center gap-2" disabled={submitting || isProfileIncomplete || isResumeMissing || !!existingApplication}>
               {submitting ? (<>Submitting...</>) : (<>
                   Submit Application <Send className="h-4 w-4"/>
                 </>)}
