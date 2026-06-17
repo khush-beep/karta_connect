@@ -211,7 +211,7 @@ function AdminStudentsPage() {
         <Dialog open={isWhitelistOpen} onOpenChange={setIsWhitelistOpen}>
           <DialogTrigger asChild>
             <Button className="flex items-center gap-2">
-              <Plus className="h-4 w-4"/> Whitelist Student
+              <Plus className="h-4 w-4"/> Add Student
             </Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-md">

@@ -20,7 +20,7 @@ function AdminPostDetailsPage() {
             return;
         setLoading(true);
         try {
-            // 1. Fetch job post details
+            // 1. Fetch job post details and raw applications
             const [postRes, appsRes] = await Promise.all([
                 supabase
                     .from("job_posts")
@@ -29,16 +29,32 @@ function AdminPostDetailsPage() {
                     .maybeSingle(),
                 supabase
                     .from("applications")
-                    .select("*, student:student_profiles(*)")
+                    .select("*")
                     .eq("post_id", postId)
                     .order("applied_at", { ascending: false })
             ]);
-            if (postRes.error)
-                throw postRes.error;
-            if (appsRes.error)
-                throw appsRes.error;
+            if (postRes.error) throw postRes.error;
+            if (appsRes.error) throw appsRes.error;
+
+            let appsData = appsRes.data || [];
+
+            // 2. Fetch student profiles manually to resolve the schema cache relationship issue
+            if (appsData.length > 0) {
+                const studentIds = appsData.map(a => a.student_id);
+                const studentsRes = await supabase
+                    .from("student_profiles")
+                    .select("*")
+                    .in("user_id", studentIds);
+                
+                if (studentsRes.data) {
+                    const sMap = {};
+                    studentsRes.data.forEach(s => { sMap[s.user_id] = s; });
+                    appsData = appsData.map(a => ({ ...a, student: sMap[a.student_id] }));
+                }
+            }
+
             setPost(postRes.data);
-            setApplications(appsRes.data || []);
+            setApplications(appsData);
         }
         catch (err) {
             console.error("Error loading post details:", err);
