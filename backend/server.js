@@ -267,18 +267,18 @@ app.post("/api/auth/signup", async (req, res) => {
       auth: { persistSession: false }
     });
 
-    const { data: authData, error: signUpError } = await newUserClient.auth.signUp({
+    const { data: newAuthData, error: newSignUpError } = await newUserClient.auth.signUp({
       email: cleanEmail,
       password: password
     });
 
-    if (signUpError || !authData.user) {
+    if (newSignUpError || !newAuthData.user) {
       throw new Error(
-        signUpError ? signUpError.message : "Failed to create auth user.",
+        newSignUpError ? newSignUpError.message : "Failed to create auth user.",
       );
     }
 
-    const newUserId = authData.user?.id;
+    const newUserId = newAuthData.user?.id;
 
     console.log("NEW USER ID:", newUserId);
 
