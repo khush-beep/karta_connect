@@ -150,11 +150,26 @@ app.post("/api/auth/signup", async (req, res) => {
     }
 
     // Auth signUp
+    const { data: existingUsers } = await adminClient.auth.admin.listUsers();
+
+    const existingUser = existingUsers.users.find(
+      (u) => u.email === cleanEmail,
+    );
+
+    if (existingUser) {
+      throw new Error("This account already exists. Please login instead.");
+    }
     const { data: authData, error: signUpError } =
-      await adminClient.auth.signUp({
+      await adminClient.auth.admin.createUser({
         email: cleanEmail,
         password: password,
+        email_confirm: true,
       });
+
+    console.log("CREATED USER:", authData.user);
+    console.log("EMAIL CONFIRMED AT:", authData.user?.email_confirmed_at);
+
+    console.log(authData.user);
 
     console.log("AUTH DATA:", authData);
     console.log("SIGNUP ERROR:", signUpError);
@@ -165,7 +180,7 @@ app.post("/api/auth/signup", async (req, res) => {
       );
     }
 
-    const newUserId = authData.user.id;
+    const newUserId = authData.user?.id;
 
     console.log("NEW USER ID:", newUserId);
 
