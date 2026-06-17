@@ -204,10 +204,7 @@ app.post("/api/auth/signup", async (req, res) => {
       auth: { persistSession: false }
     });
 
-    const { data: authData, error: signUpError } = await newUserClient.auth.signUp({
-      email: cleanEmail,
-      password: password
-    });
+ 
 
     if (signUpError || !authData.user) {
       throw new Error(

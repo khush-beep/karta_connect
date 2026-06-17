@@ -52,8 +52,11 @@ function AdminStudentProfileDetailsPage() {
       console.error("Error loading student details:", err);
       toast.error("Failed to load details.");
     }
-<<<<<<< HEAD
-    function getResumeDownloadUrl(filePath) {
+    finally {
+      setLoading(false);
+    }
+  }
+  function getResumeDownloadUrl(filePath) {
         if (filePath.startsWith("http://") || filePath.startsWith("https://")) {
             return filePath;
         }
@@ -64,9 +67,6 @@ function AdminStudentProfileDetailsPage() {
         return (<div className="flex h-[50vh] items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary"/>
       </div>);
-=======
-    finally {
-      setLoading(false);
     }
   }
   useEffect(() => {
@@ -85,7 +85,6 @@ function AdminStudentProfileDetailsPage() {
         throw error;
       toast.success(`Student successfully ${!profile.blocked ? "blocked" : "unblocked"}!`);
       loadData();
->>>>>>> 37a45973dcca1cb29bb5f69e65d6d24e9847bb39
     }
     catch (err) {
       toast.error(err.message || "Failed to update block state.");
@@ -254,3 +253,4 @@ function AdminStudentProfileDetailsPage() {
     </div>
   </div>);
 }
+  

@@ -33,31 +33,6 @@ import { Button } from "@/components/ui/button";
 import { signOut, useAuth } from "@/hooks/use-auth";
 import { useEffect, useState } from "react";
 const NAV = {
-<<<<<<< HEAD
-    student: [
-        { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-        { to: "/student/profile", label: "Profile", icon: User },
-        
-        { to: "/student/applications", label: "Applications", icon: FileText },
-        { to: "/settings", label: "Settings", icon: Settings },
-    ],
-    company: [
-        { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-        { to: "/company/profile", label: "Company Profile", icon: Building2 },
-        { to: "/company/posts", label: "Job Posts", icon: Briefcase, search: { type: "job" } },
-        { to: "/company/posts", label: "Internship Posts", icon: GraduationCap, search: { type: "internship" } },
-        { to: "/company/applications", label: "Applicants", icon: ClipboardList },
-        { to: "/settings", label: "Settings", icon: Settings },
-    ],
-    admin: [
-        { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-        { to: "/admin/analytics", label: "Analytics", icon: BarChart3 },
-        { to: "/admin/students", label: "Students", icon: Users },
-        { to: "/admin/companies", label: "Companies", icon: Building2 },
-        { to: "/admin/posts", label: "Postings", icon: Briefcase },
-        { to: "/settings", label: "Settings", icon: Settings },
-    ],
-=======
   student: [
     { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { to: "/student/profile", label: "Profile", icon: User },
@@ -87,7 +62,6 @@ const NAV = {
     { to: "/admin/posts", label: "Postings", icon: Briefcase },
     { to: "/settings", label: "Settings", icon: Settings },
   ],
->>>>>>> 37a45973dcca1cb29bb5f69e65d6d24e9847bb39
 };
 function useTheme() {
   const [theme, setTheme] = useState(() =>
