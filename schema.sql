@@ -34,6 +34,9 @@ CREATE TABLE IF NOT EXISTS public.student_profiles (
     skills TEXT[] DEFAULT '{}'::text[] NOT NULL,
     achievements TEXT,
     extracurriculars TEXT,
+    github_url TEXT,
+    portfolio_url TEXT,
+    project_url TEXT,
     resume_url TEXT,
     avatar_url TEXT,
     bio TEXT,
@@ -41,6 +44,11 @@ CREATE TABLE IF NOT EXISTS public.student_profiles (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+
+ALTER TABLE public.student_profiles
+    ADD COLUMN IF NOT EXISTS github_url TEXT,
+    ADD COLUMN IF NOT EXISTS portfolio_url TEXT,
+    ADD COLUMN IF NOT EXISTS project_url TEXT;
 
 -- 4. Create Companies Table
 CREATE TABLE IF NOT EXISTS public.companies (
