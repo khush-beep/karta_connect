@@ -5,7 +5,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { TrendingUp, Users, Building2, Briefcase, Loader2, GraduationCap } from "lucide-react";
 import { toast } from "sonner";
+import { requireAdmin } from "@/lib/route-guards";
 export const Route = createFileRoute("/_authenticated/admin/analytics")({
+    beforeLoad: requireAdmin,
     component: AdminAnalytics,
 });
 const PIE_COLORS = ["#e2b13c", "#3b82f6", "#10b981", "#8b5cf6", "#ec4899"];

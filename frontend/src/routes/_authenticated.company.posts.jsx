@@ -9,7 +9,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Loader2, Plus, Calendar, MapPin, Briefcase, Trash2, Power, PowerOff, X } from "lucide-react";
+import { requireCompany } from "@/lib/route-guards";
 export const Route = createFileRoute("/_authenticated/company/posts")({
+    beforeLoad: requireCompany,
     validateSearch: (search) => {
         return {
             type: search.type || undefined,

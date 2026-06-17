@@ -9,20 +9,17 @@ import { toast } from "sonner";
 import { Users, Search, ShieldAlert, ShieldCheck, Trash2, Loader2, Plus } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { requireAdmin } from "@/lib/route-guards";
+import { authenticatedFetch } from "@/lib/api-client";
 export const Route = createFileRoute("/_authenticated/admin/students/")({
+    beforeLoad: requireAdmin,
     component: AdminStudentsPage,
 });
 async function deleteStudentAccount(userId, email) {
-    const res = await fetch("http://localhost:3001/api/admin/delete-student", {
+    return authenticatedFetch("http://localhost:3001/api/admin/delete-student", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, email })
     });
-    if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || "Failed to delete student account");
-    }
-    return res.json();
 }
 function AdminStudentsPage() {
     const navigate = useNavigate();

@@ -7,7 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Loader2, User, FileText, Info, ExternalLink } from "lucide-react";
+import { requireCompany } from "@/lib/route-guards";
 export const Route = createFileRoute("/_authenticated/company/applications")({
+    beforeLoad: requireCompany,
     component: CompanyApplicationsPage,
 });
 function CompanyApplicationsPage() {

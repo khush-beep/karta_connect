@@ -8,7 +8,9 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Loader2, User, BookOpen, Award, FileText, Upload, X } from "lucide-react";
+import { requireStudent } from "@/lib/route-guards";
 export const Route = createFileRoute("/_authenticated/student/profile")({
+    beforeLoad: requireStudent,
     component: StudentProfilePage,
 });
 function StudentProfilePage() {

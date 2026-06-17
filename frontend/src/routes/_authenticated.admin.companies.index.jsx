@@ -9,7 +9,9 @@ import { toast } from "sonner";
 import { Building2, Search, Plus, ShieldAlert, ShieldCheck, Loader2, Globe, Mail, Briefcase } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { requireAdmin } from "@/lib/route-guards";
 export const Route = createFileRoute("/_authenticated/admin/companies/")({
+    beforeLoad: requireAdmin,
     component: AdminCompanies,
 });
 function AdminCompanies() {

@@ -45,6 +45,69 @@ async function getAdminClient() {
   return client;
 }
 
+// Middleware to verify JWT and attach user info to request
+async function authMiddleware(req, res, next) {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Missing or invalid authorization header' });
+    }
+
+    const token = authHeader.substring(7);
+    
+    // Create a client with the user's token to verify it
+    const client = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: { persistSession: false }
+    });
+
+    // Set the session with the token
+    const { data: { user }, error: userError } = await client.auth.getUser(token);
+    
+    if (userError || !user) {
+      return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+
+    // Fetch user's role
+    const { data: roleData } = await client
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    req.user = user;
+    req.role = roleData?.role || null;
+    next();
+  } catch (err) {
+    console.error('Auth middleware error:', err);
+    return res.status(401).json({ error: 'Authentication failed' });
+  }
+}
+
+// Middleware to require admin role
+function requireAdminRole(req, res, next) {
+  if (req.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  next();
+}
+
+// Middleware to require company role
+function requireCompanyRole(req, res, next) {
+  if (req.role !== 'company') {
+    return res.status(403).json({ error: 'Company access required' });
+  }
+  next();
+}
+
+// Middleware to require student role
+function requireStudentRole(req, res, next) {
+  if (req.role !== 'student') {
+    return res.status(403).json({ error: 'Student access required' });
+  }
+  next();
+}
+
+
 // 1. Resolve Login Route
 app.post('/api/auth/resolve-login', async (req, res) => {
   const { email } = req.body;
@@ -212,8 +275,14 @@ app.post('/api/auth/signup', async (req, res) => {
 });
 
 // 3. Delete Own Account Route
-app.post('/api/account/delete', async (req, res) => {
+app.post('/api/account/delete', authMiddleware, async (req, res) => {
   const { userId } = req.body;
+  
+  // Users can only delete their own account
+  if (userId !== req.user.id) {
+    return res.status(403).json({ error: 'You can only delete your own account.' });
+  }
+
   if (!userId) {
     return res.status(400).json({ error: 'User ID is required.' });
   }
@@ -238,7 +307,7 @@ app.post('/api/account/delete', async (req, res) => {
 });
 
 // 4. Admin Delete Student Route
-app.post('/api/admin/delete-student', async (req, res) => {
+app.post('/api/admin/delete-student', authMiddleware, requireAdminRole, async (req, res) => {
   const { userId, email } = req.body;
   if (!userId || !email) {
     return res.status(400).json({ error: 'User ID and email parameters are required.' });
@@ -261,6 +330,259 @@ app.post('/api/admin/delete-student', async (req, res) => {
   } catch (err) {
     console.error('Admin delete student error:', err);
     return res.status(500).json({ error: err.message || 'Failed to delete student.' });
+  }
+});
+
+// 5. Get Company Data (Verify Ownership)
+app.get('/api/company/:companyId', authMiddleware, requireCompanyRole, async (req, res) => {
+  const { companyId } = req.params;
+  
+  try {
+    const client = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: { persistSession: false }
+    });
+    
+    const { data: company } = await client
+      .from('companies')
+      .select('*')
+      .eq('id', companyId)
+      .maybeSingle();
+
+    if (!company) {
+      return res.status(404).json({ error: 'Company not found' });
+    }
+
+    // Verify ownership
+    if (company.owner_user_id !== req.user.id) {
+      return res.status(403).json({ error: 'You do not have access to this company' });
+    }
+
+    return res.json(company);
+  } catch (err) {
+    console.error('Get company error:', err);
+    return res.status(500).json({ error: 'Failed to fetch company data' });
+  }
+});
+
+// 6. Get Company Job Posts (Verify Ownership)
+app.get('/api/company/:companyId/posts', authMiddleware, requireCompanyRole, async (req, res) => {
+  const { companyId } = req.params;
+  
+  try {
+    const client = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: { persistSession: false }
+    });
+    
+    // First verify company ownership
+    const { data: company } = await client
+      .from('companies')
+      .select('owner_user_id')
+      .eq('id', companyId)
+      .maybeSingle();
+
+    if (!company || company.owner_user_id !== req.user.id) {
+      return res.status(403).json({ error: 'You do not have access to this company' });
+    }
+
+    // Get company's job posts
+    const { data: posts } = await client
+      .from('job_posts')
+      .select('*')
+      .eq('company_id', companyId);
+
+    return res.json(posts || []);
+  } catch (err) {
+    console.error('Get company posts error:', err);
+    return res.status(500).json({ error: 'Failed to fetch job posts' });
+  }
+});
+
+// 7. Update Job Post (Verify Company Ownership)
+app.put('/api/job-posts/:postId', authMiddleware, requireCompanyRole, async (req, res) => {
+  const { postId } = req.params;
+  const { title, description, location, deadline, type } = req.body;
+  
+  try {
+    const client = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: { persistSession: false }
+    });
+    
+    // Verify post ownership through company
+    const { data: post } = await client
+      .from('job_posts')
+      .select('company:companies(owner_user_id)')
+      .eq('id', postId)
+      .maybeSingle();
+
+    if (!post || post.company.owner_user_id !== req.user.id) {
+      return res.status(403).json({ error: 'You do not have permission to edit this job post' });
+    }
+
+    const { error: updateError } = await client
+      .from('job_posts')
+      .update({ title, description, location, deadline, type })
+      .eq('id', postId);
+
+    if (updateError) throw updateError;
+
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('Update job post error:', err);
+    return res.status(500).json({ error: err.message || 'Failed to update job post' });
+  }
+});
+
+// 8. Delete Job Post (Verify Company Ownership)
+app.delete('/api/job-posts/:postId', authMiddleware, requireCompanyRole, async (req, res) => {
+  const { postId } = req.params;
+  
+  try {
+    const client = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: { persistSession: false }
+    });
+    
+    // Verify post ownership
+    const { data: post } = await client
+      .from('job_posts')
+      .select('company:companies(owner_user_id)')
+      .eq('id', postId)
+      .maybeSingle();
+
+    if (!post || post.company.owner_user_id !== req.user.id) {
+      return res.status(403).json({ error: 'You do not have permission to delete this job post' });
+    }
+
+    const { error: deleteError } = await client
+      .from('job_posts')
+      .delete()
+      .eq('id', postId);
+
+    if (deleteError) throw deleteError;
+
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('Delete job post error:', err);
+    return res.status(500).json({ error: err.message || 'Failed to delete job post' });
+  }
+});
+
+// 9. Get Student Profile (Verify Self-Access)
+app.get('/api/student/profile', authMiddleware, requireStudentRole, async (req, res) => {
+  try {
+    const client = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: { persistSession: false }
+    });
+    
+    const { data: profile } = await client
+      .from('student_profiles')
+      .select('*')
+      .eq('user_id', req.user.id)
+      .maybeSingle();
+
+    if (!profile) {
+      return res.status(404).json({ error: 'Student profile not found' });
+    }
+
+    return res.json(profile);
+  } catch (err) {
+    console.error('Get student profile error:', err);
+    return res.status(500).json({ error: 'Failed to fetch profile' });
+  }
+});
+
+// 10. Update Student Profile (Verify Self-Access)
+app.put('/api/student/profile', authMiddleware, requireStudentRole, async (req, res) => {
+  const { name, location, skills, bio, achievements, extracurriculars } = req.body;
+  
+  try {
+    const client = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: { persistSession: false }
+    });
+    
+    // Verify profile exists and belongs to user
+    const { data: profile } = await client
+      .from('student_profiles')
+      .select('user_id')
+      .eq('user_id', req.user.id)
+      .maybeSingle();
+
+    if (!profile) {
+      return res.status(404).json({ error: 'Student profile not found' });
+    }
+
+    const { error: updateError } = await client
+      .from('student_profiles')
+      .update({ name, location, skills, bio, achievements, extracurriculars })
+      .eq('user_id', req.user.id);
+
+    if (updateError) throw updateError;
+
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('Update student profile error:', err);
+    return res.status(500).json({ error: err.message || 'Failed to update profile' });
+  }
+});
+
+// 11. Get Student Applications (Verify Self-Access)
+app.get('/api/student/applications', authMiddleware, requireStudentRole, async (req, res) => {
+  try {
+    const client = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: { persistSession: false }
+    });
+    
+    const { data: applications } = await client
+      .from('applications')
+      .select('*')
+      .eq('student_id', req.user.id);
+
+    return res.json(applications || []);
+  } catch (err) {
+    console.error('Get student applications error:', err);
+    return res.status(500).json({ error: 'Failed to fetch applications' });
+  }
+});
+
+// 12. Submit Application (Verify Student Self)
+app.post('/api/student/applications', authMiddleware, requireStudentRole, async (req, res) => {
+  const { postId, coverNote } = req.body;
+  
+  if (!postId) {
+    return res.status(400).json({ error: 'Post ID is required' });
+  }
+  
+  try {
+    const client = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: { persistSession: false }
+    });
+    
+    // Check if already applied
+    const { data: existingApp } = await client
+      .from('applications')
+      .select('id')
+      .eq('student_id', req.user.id)
+      .eq('post_id', postId)
+      .maybeSingle();
+
+    if (existingApp) {
+      return res.status(400).json({ error: 'You have already applied for this position' });
+    }
+
+    const { error: insertError } = await client
+      .from('applications')
+      .insert({
+        post_id: postId,
+        student_id: req.user.id,
+        cover_note: coverNote,
+        status: 'applied'
+      });
+
+    if (insertError) throw insertError;
+
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('Submit application error:', err);
+    return res.status(500).json({ error: err.message || 'Failed to submit application' });
   }
 });
 

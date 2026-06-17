@@ -8,20 +8,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { User, Lock, Sun, Moon, Trash2, Loader2 } from "lucide-react";
+import { authenticatedFetch } from "@/lib/api-client";
 export const Route = createFileRoute("/_authenticated/settings")({
     component: SettingsPage,
 });
 async function deleteUserAccount(userId) {
-    const res = await fetch("http://localhost:3001/api/account/delete", {
+    return authenticatedFetch("http://localhost:3001/api/account/delete", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId })
     });
-    if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || "Failed to delete account");
-    }
-    return res.json();
 }
 function SettingsPage() {
     const { user, role } = useAuth();
