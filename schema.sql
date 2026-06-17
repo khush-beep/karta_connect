@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS public.student_profiles (
     extracurriculars TEXT,
     resume_url TEXT,
     avatar_url TEXT,
+    certificate_url TEXT,
     bio TEXT,
     blocked BOOLEAN DEFAULT false NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
