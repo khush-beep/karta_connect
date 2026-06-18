@@ -8,26 +8,23 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { User, Lock, Sun, Moon, Trash2, Loader2 } from "lucide-react";
+import { authenticatedFetch } from "@/lib/api-client";
 export const Route = createFileRoute("/_authenticated/settings")({
     component: SettingsPage,
 });
 async function deleteUserAccount(userId) {
-    const res = await fetch("http://localhost:3001/api/account/delete", {
+    return authenticatedFetch("http://localhost:3001/api/account/delete", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId })
     });
-    if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || "Failed to delete account");
-    }
-    return res.json();
 }
 function SettingsPage() {
     const { user, role } = useAuth();
     const [profileName, setProfileName] = useState("");
     const [loadingProfile, setLoadingProfile] = useState(true);
     const [savingProfile, setSavingProfile] = useState(false);
+    const [shareUrl, setShareUrl] = useState("");
+    const [copyingUrl, setCopyingUrl] = useState(false);
     // Password state
     const [oldPassword, setOldPassword] = useState("");
     const [newPassword, setNewPassword] = useState("");
@@ -79,7 +76,29 @@ function SettingsPage() {
             }
         }
         loadProfileName();
+        if (user && role === "student" && typeof window !== "undefined") {
+            setShareUrl(`${window.location.origin}/students/${user.id}`);
+        }
+        else {
+            setShareUrl("");
+        }
     }, [user, role]);
+    async function copyProfileUrl() {
+        if (!shareUrl)
+            return;
+        setCopyingUrl(true);
+        try {
+            await navigator.clipboard.writeText(shareUrl);
+            toast.success("Profile URL copied to clipboard!");
+        }
+        catch (err) {
+            console.error("Clipboard write failed:", err);
+            toast.error("Unable to copy URL. Please copy it manually.");
+        }
+        finally {
+            setCopyingUrl(false);
+        }
+    }
     async function handleProfileSave(e) {
         e.preventDefault();
         if (!user || role === "admin")
@@ -211,6 +230,27 @@ function SettingsPage() {
             </form>
           </CardContent>
         </Card>
+
+        {role === "student" && (<Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <User className="h-5 w-5 text-primary"/> Profile Sharing
+            </CardTitle>
+            <CardDescription>Share a direct link to your student profile with other Karta users.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-[1fr_auto] items-end">
+            <div className="grid gap-2">
+              <Label htmlFor="share-url">Profile URL</Label>
+              <Input id="share-url" value={shareUrl} readOnly className="bg-muted" />
+              <p className="text-xs text-muted-foreground">
+                Anyone on the platform can open this URL to view your public student profile.
+              </p>
+            </div>
+            <Button type="button" onClick={copyProfileUrl} disabled={!shareUrl || copyingUrl} className="h-11">
+              {copyingUrl ? "Copying..." : "Copy Link"}
+            </Button>
+          </CardContent>
+        </Card>)}
 
         {/* Change Password */}
         <Card>

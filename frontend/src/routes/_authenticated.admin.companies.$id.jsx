@@ -6,7 +6,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
 import { Building2, ArrowLeft, Globe, Mail, Phone, MapPin, Briefcase, Users, FileText, CheckCircle2, Loader2, Trash2 } from "lucide-react";
+import { requireAdmin } from "@/lib/route-guards";
 export const Route = createFileRoute("/_authenticated/admin/companies/$id")({
+    beforeLoad: requireAdmin,
     component: AdminCompanyDetails,
 });
 function AdminCompanyDetails() {
@@ -302,70 +304,5 @@ function AdminCompanyDetails() {
         </CardContent>
       </Card>
 
-      {/* Company Candidate Applications */}
-      <Card className="shadow-sm">
-        <CardHeader>
-          <CardTitle>Candidate Pipeline</CardTitle>
-          <CardDescription>Scholars who applied to this company's postings.</CardDescription>
-        </CardHeader>
-        <CardContent className="p-0">
-          {applications.length === 0 ? (<div className="text-center py-8 text-sm text-muted-foreground">No candidate applications have been submitted yet.</div>) : (<Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Candidate</TableHead>
-                  <TableHead>University</TableHead>
-                  <TableHead>Applied Role</TableHead>
-                  <TableHead>Applied Date</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {applications.map((app) => {
-                const statusStyles = {
-                    applied: "bg-blue-500/10 text-blue-500 border-blue-500/20",
-                    review: "bg-amber-500/10 text-amber-500 border-amber-500/20",
-                    selected: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
-                    rejected: "bg-destructive/10 text-destructive border-destructive/20"
-                };
-                return (<TableRow key={app.id} className="hover:bg-muted/30 transition-colors">
-                      <TableCell>
-                        <div className="font-semibold text-foreground">
-                          <Link to="/admin/students/$id" params={{ id: app.student_id }} className="hover:underline text-primary">
-                            {app.studentName}
-                          </Link>
-                        </div>
-                        <div className="text-xs text-muted-foreground mt-0.5">{app.studentEmail}</div>
-                      </TableCell>
-                      <TableCell className="text-sm font-medium">{app.studentUniversity}</TableCell>
-                      <TableCell className="font-semibold text-foreground">{app.job_posts?.title || "N/A"}</TableCell>
-                      <TableCell className="text-sm">{new Date(app.applied_at).toLocaleDateString()}</TableCell>
-                      <TableCell>
-                        <span className={`text-xs border px-2.5 py-0.5 rounded-full capitalize font-semibold ${statusStyles[app.status]}`}>
-                          {app.status}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right space-x-2">
-                        {app.resumeUrl && (<Button asChild variant="outline" size="sm" className="h-8">
-                            <a href={app.resumeUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1">
-                              Resume
-                            </a>
-                          </Button>)}
-                        <select value={app.status} onChange={(e) => changeAppStatus(app.id, e.target.value)} className="h-8 rounded-md border border-input bg-background px-2 py-0.5 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring font-medium">
-                          <option value="applied">Applied</option>
-                          <option value="review">Review</option>
-                          <option value="selected">Selected</option>
-                          <option value="rejected">Rejected</option>
-                        </select>
-                        <Button onClick={() => deleteApplication(app.id)} variant="destructive" size="sm" className="h-8">
-                          <Trash2 className="h-3.5 w-3.5"/>
-                        </Button>
-                      </TableCell>
-                    </TableRow>);
-            })}
-              </TableBody>
-            </Table>)}
-        </CardContent>
-      </Card>
     </div>);
 }

@@ -16,24 +16,16 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import {
-  Loader2,
-  Plus,
-  Calendar,
-  MapPin,
-  Briefcase,
-  Trash2,
-  Power,
-  PowerOff,
-  X,
-} from "lucide-react";
+import { Loader2, Plus, Calendar, MapPin, Briefcase, Trash2, Power, PowerOff, X } from "lucide-react";
+import { requireCompany } from "@/lib/route-guards";
 export const Route = createFileRoute("/_authenticated/company/posts")({
-  validateSearch: (search) => {
-    return {
-      type: search.type || undefined,
-    };
-  },
-  component: CompanyPostsPage,
+    beforeLoad: requireCompany,
+    validateSearch: (search) => {
+        return {
+            type: search.type || undefined,
+        };
+    },
+    component: CompanyPostsPage,
 });
 function CompanyPostsPage() {
   const { user } = useAuth();

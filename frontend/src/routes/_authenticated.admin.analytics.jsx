@@ -5,7 +5,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from "recharts";
 import { TrendingUp, Users, Building2, Briefcase, Loader2, GraduationCap, MapPin, Layers, LineChart as LineChartIcon } from "lucide-react";
 import { toast } from "sonner";
+import { requireAdmin } from "@/lib/route-guards";
 export const Route = createFileRoute("/_authenticated/admin/analytics")({
+    beforeLoad: requireAdmin,
     component: AdminAnalytics,
 });
 const PIE_COLORS = [
@@ -92,13 +94,13 @@ function AdminAnalytics() {
             // Analytics by Domain (Industry for companies)
             const dCounts = {};
             cData.forEach(c => { if (c.industry) { dCounts[c.industry] = (dCounts[c.industry] || 0) + 1; } });
-            const dArr = Object.keys(dCounts).map(k => ({ name: k, value: dCounts[k] })).sort((a,b)=>b.value-a.value).slice(0, 10);
+            const dArr = Object.keys(dCounts).map(k => ({ name: k, value: dCounts[k] })).sort((a,b)=>b.value-a.value).slice(0, 6);
             setDomainData(dArr);
 
             // Analytics by Course (For students)
             const courseCounts = {};
             sData.forEach(s => { if (s.course) { courseCounts[s.course] = (courseCounts[s.course] || 0) + 1; } });
-            const courseArr = Object.keys(courseCounts).map(k => ({ name: k, value: courseCounts[k] })).sort((a,b)=>b.value-a.value).slice(0, 10);
+            const courseArr = Object.keys(courseCounts).map(k => ({ name: k, value: courseCounts[k] })).sort((a,b)=>b.value-a.value).slice(0, 6);
             setCourseData(courseArr);
 
             // Analytics by Region (Location)
@@ -109,7 +111,7 @@ function AdminAnalytics() {
                     rCounts[loc] = (rCounts[loc] || 0) + 1; 
                 }
             });
-            const rArr = Object.keys(rCounts).map(k => ({ name: k, value: rCounts[k] })).sort((a,b)=>b.value-a.value).slice(0, 10);
+            const rArr = Object.keys(rCounts).map(k => ({ name: k, value: rCounts[k] })).sort((a,b)=>b.value-a.value).slice(0, 6);
             setRegionData(rArr);
 
             // Analytics by User (Growth over time by month)
@@ -345,7 +347,7 @@ function AdminAnalytics() {
                   <BarChart data={domainData} layout="vertical" margin={{ top: 0, right: 0, left: 20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" opacity={0.3} horizontal={true} vertical={false}/>
                     <XAxis type="number" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
-                    <YAxis dataKey="name" type="category" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} width={100} />
+                    <YAxis dataKey="name" type="category" stroke="#888888" fontSize={11} tickLine={false} axisLine={false} width={150} tickFormatter={(value) => value.length > 20 ? value.substring(0, 20) + '...' : value} />
                     <Tooltip cursor={{ fill: "rgba(0,0,0,0.03)" }}/>
                     <Bar dataKey="value" fill="#ec4899" radius={[0, 4, 4, 0]} barSize={20} />
                   </BarChart>
@@ -370,7 +372,7 @@ function AdminAnalytics() {
                   <BarChart data={courseData} layout="vertical" margin={{ top: 0, right: 0, left: 20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" opacity={0.3} horizontal={true} vertical={false}/>
                     <XAxis type="number" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
-                    <YAxis dataKey="name" type="category" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} width={100} />
+                    <YAxis dataKey="name" type="category" stroke="#888888" fontSize={11} tickLine={false} axisLine={false} width={150} tickFormatter={(value) => value.length > 20 ? value.substring(0, 20) + '...' : value} />
                     <Tooltip cursor={{ fill: "rgba(0,0,0,0.03)" }}/>
                     <Bar dataKey="value" fill="#06b6d4" radius={[0, 4, 4, 0]} barSize={20} />
                   </BarChart>

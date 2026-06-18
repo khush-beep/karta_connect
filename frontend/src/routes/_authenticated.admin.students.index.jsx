@@ -1,37 +1,126 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Users, Search, ShieldAlert, ShieldCheck, Trash2, Loader2, Plus } from "lucide-react";
+import { Users, Search, ShieldAlert, ShieldCheck, Trash2, Loader2, Plus, Upload, Download } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { requireAdmin } from "@/lib/route-guards";
+import { authenticatedFetch } from "@/lib/api-client";
+import * as XLSX from "xlsx";
+
 export const Route = createFileRoute("/_authenticated/admin/students/")({
+    beforeLoad: requireAdmin,
     component: AdminStudentsPage,
 });
 async function deleteStudentAccount(userId, email) {
-    const res = await fetch("http://localhost:3001/api/admin/delete-student", {
+    return authenticatedFetch("http://localhost:3001/api/admin/delete-student", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, email })
     });
-    if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || "Failed to delete student account");
-    }
-    return res.json();
 }
 function AdminStudentsPage() {
     const navigate = useNavigate();
+    const fileInputRef = useRef(null);
     const [students, setStudents] = useState([]);
     const [whitelist, setWhitelist] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
     const [isWhitelistOpen, setIsWhitelistOpen] = useState(false);
+
+    async function handleDownloadTemplate() {
+        const templateData = [
+            { Email: "student@example.com", Name: "John Doe", Place: "New York", University: "NYU", Course: "Computer Science" }
+        ];
+        const ws = XLSX.utils.json_to_sheet(templateData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Template");
+        XLSX.writeFile(wb, "Student_Upload_Template.xlsx");
+    }
+
+    async function handleFileUpload(e) {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setLoading(true);
+        try {
+            const data = await file.arrayBuffer();
+            const workbook = XLSX.read(data);
+            const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+            const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+            if (!jsonData || jsonData.length === 0) {
+                toast.error("The uploaded file is empty.");
+                return;
+            }
+
+            // Fetch existing emails to avoid duplicates
+            const [profilesRes, whitelistRes] = await Promise.all([
+                supabase.from("student_profiles").select("email"),
+                supabase.from("student_whitelist").select("email")
+            ]);
+
+            const recordsToInsert = [];
+
+            for (const row of jsonData) {
+                const email = row.Email?.toString().trim().toLowerCase() || row.email?.toString().trim().toLowerCase();
+                const name = row.Name?.toString().trim() || row.name?.toString().trim();
+                
+                if (!email || !name) {
+                    continue; // Skip rows without email or name
+                }
+
+                recordsToInsert.push({
+                    email: email,
+                    name: name,
+                    place: (row.Place || row.place || "").toString().trim(),
+                    university: (row.University || row.university || "").toString().trim(),
+                    course: (row.Course || row.course || "").toString().trim(),
+                    year_of_study: "1st Year",
+                    graduation_year: String(new Date().getFullYear() + 4),
+                    used: false
+                });
+            }
+
+            if (recordsToInsert.length === 0) {
+                toast.error("No valid students found in the file.");
+                return;
+            }
+
+            const response = await fetch("http://localhost:3001/api/admin/bulk-upload-whitelist", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ records: recordsToInsert })
+            });
+
+            if (!response.ok) {
+                const errData = await response.json().catch(() => ({}));
+                throw new Error(errData.error || "Failed to upload students.");
+            }
+
+            const responseData = await response.json();
+
+            if (responseData.inserted > 0) {
+                toast.success(`Successfully added ${responseData.inserted} students! ${responseData.skipped > 0 ? `Skipped ${responseData.skipped} duplicates.` : ""} ${responseData.failed > 0 ? `Failed ${responseData.failed}.` : ""}`);
+                loadData();
+            } else if (responseData.failed > 0) {
+                toast.error(`Failed to add students. ${responseData.failed} records encountered errors.`);
+            } else {
+                toast.error(`No valid new students found. ${responseData.skipped} skipped (duplicates).`);
+            }
+        } catch (err) {
+            console.error("Excel upload error:", err);
+            toast.error(err.message || "Failed to process Excel file.");
+        } finally {
+            if (fileInputRef.current) fileInputRef.current.value = "";
+            setLoading(false);
+        }
+    }
     async function handleRemoveRegistered(profileId, email) {
         const confirmDelete = window.confirm("Are you sure you want to permanently delete this student, their profile, applications, and account?");
         if (!confirmDelete)
@@ -208,12 +297,26 @@ function AdminStudentsPage() {
           <p className="text-muted-foreground font-medium">Verify whitelists, adjust security blocks, and query student profiles.</p>
         </div>
 
-        <Dialog open={isWhitelistOpen} onOpenChange={setIsWhitelistOpen}>
-          <DialogTrigger asChild>
-            <Button className="flex items-center gap-2">
-              <Plus className="h-4 w-4"/> Add Student
-            </Button>
-          </DialogTrigger>
+        <div className="flex flex-wrap items-center gap-2">
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            className="hidden" 
+            accept=".xlsx, .xls, .csv" 
+            onChange={handleFileUpload} 
+          />
+          <Button variant="outline" className="flex items-center gap-2" onClick={handleDownloadTemplate}>
+            <Download className="h-4 w-4"/> Template
+          </Button>
+          <Button variant="outline" className="flex items-center gap-2" onClick={() => fileInputRef.current?.click()}>
+            <Upload className="h-4 w-4"/> Upload Excel
+          </Button>
+          <Dialog open={isWhitelistOpen} onOpenChange={setIsWhitelistOpen}>
+            <DialogTrigger asChild>
+              <Button className="flex items-center gap-2">
+                <Plus className="h-4 w-4"/> Add Student
+              </Button>
+            </DialogTrigger>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle>Add to Whitelist</DialogTitle>
@@ -252,6 +355,7 @@ function AdminStudentsPage() {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {/* Filter and Search */}
