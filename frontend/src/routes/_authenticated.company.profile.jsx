@@ -8,7 +8,9 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Loader2, Building2, Link, MapPin, Phone } from "lucide-react";
+import { requireCompany } from "@/lib/route-guards";
 export const Route = createFileRoute("/_authenticated/company/profile")({
+    beforeLoad: requireCompany,
     component: CompanyProfilePage,
 });
 function CompanyProfilePage() {

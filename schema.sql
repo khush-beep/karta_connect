@@ -34,13 +34,22 @@ CREATE TABLE IF NOT EXISTS public.student_profiles (
     skills TEXT[] DEFAULT '{}'::text[] NOT NULL,
     achievements TEXT,
     extracurriculars TEXT,
+    github_url TEXT,
+    portfolio_url TEXT,
+    project_url TEXT,
     resume_url TEXT,
     avatar_url TEXT,
+    certificate_url TEXT,
     bio TEXT,
     blocked BOOLEAN DEFAULT false NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+
+ALTER TABLE public.student_profiles
+    ADD COLUMN IF NOT EXISTS github_url TEXT,
+    ADD COLUMN IF NOT EXISTS portfolio_url TEXT,
+    ADD COLUMN IF NOT EXISTS project_url TEXT;
 
 -- 4. Create Companies Table
 CREATE TABLE IF NOT EXISTS public.companies (
@@ -83,6 +92,18 @@ CREATE TABLE IF NOT EXISTS public.applications (
     applied_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
+ALTER TABLE public.applications
+    ADD CONSTRAINT IF NOT EXISTS applications_unique_student_post UNIQUE (student_id, post_id);
+
+-- 7. Create Saved Posts Table
+CREATE TABLE IF NOT EXISTS public.saved_posts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    student_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    post_id UUID NOT NULL REFERENCES public.job_posts(id) ON DELETE CASCADE,
+    saved_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    CONSTRAINT saved_posts_unique_student_post UNIQUE (student_id, post_id)
+);
+
 -- Enable Row Level Security on public tables
 ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.student_whitelist ENABLE ROW LEVEL SECURITY;
@@ -90,6 +111,7 @@ ALTER TABLE public.student_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.companies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.job_posts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.applications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.saved_posts ENABLE ROW LEVEL SECURITY;
 
 -- Setup RLS Policies (Allow Authenticated Selects)
 CREATE POLICY "Allow public select for user roles" ON public.user_roles FOR SELECT USING (true);
@@ -148,6 +170,16 @@ CREATE POLICY "Allow student/company to modify own application" ON public.applic
     )
 );
 CREATE POLICY "Allow admin full access to applications" ON public.applications FOR ALL USING (
+    EXISTS (
+        SELECT 1 FROM public.user_roles 
+        WHERE user_roles.user_id = auth.uid() AND user_roles.role = 'admin'
+    )
+);
+
+CREATE POLICY "Allow student to manage saved posts" ON public.saved_posts FOR SELECT USING (auth.uid() = student_id);
+CREATE POLICY "Allow student to submit saved posts" ON public.saved_posts FOR INSERT WITH CHECK (auth.uid() = student_id);
+CREATE POLICY "Allow student to modify own saved posts" ON public.saved_posts FOR UPDATE, DELETE USING (auth.uid() = student_id);
+CREATE POLICY "Allow admin full access to saved posts" ON public.saved_posts FOR ALL USING (
     EXISTS (
         SELECT 1 FROM public.user_roles 
         WHERE user_roles.user_id = auth.uid() AND user_roles.role = 'admin'
