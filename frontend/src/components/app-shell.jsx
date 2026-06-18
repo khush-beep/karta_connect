@@ -12,7 +12,6 @@ import {
   ClipboardList,
   Sun,
   Moon,
-  Bookmark,
   BarChart3,
 } from "lucide-react";
 import {
@@ -36,7 +35,6 @@ const NAV = {
   student: [
     { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { to: "/student/profile", label: "Profile", icon: User },
-    { to: "/student/saved", label: "Saved Posts", icon: Bookmark },
     { to: "/student/applications", label: "Applications", icon: FileText },
     { to: "/settings", label: "Settings", icon: Settings },
   ],

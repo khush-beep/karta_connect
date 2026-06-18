@@ -73,7 +73,7 @@ function StudentProfilePage() {
                 console.error("Error loading profile:", err);
             }
             finally {
-                setLoading(false);
+              setLoading(false);
             }
         }
         loadProfile();
